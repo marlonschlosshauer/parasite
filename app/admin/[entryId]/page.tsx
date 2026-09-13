@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getEntry } from "@/lib/entries";
+import { getEntryEditorData } from "@/lib/entries";
 import { EntryEditor } from "../_components/EntryEditor";
 import { requireGitHubAccess } from "@/lib/admin-auth";
 
@@ -11,7 +11,7 @@ export default async function EntryDetailPage({
 }) {
   await requireGitHubAccess();
   const { entryId } = await params;
-  const entry = await getEntry(entryId);
+  const { entry, previewEntries } = await getEntryEditorData(entryId);
   if (!entry) notFound();
 
   return (
@@ -39,6 +39,7 @@ export default async function EntryDetailPage({
         <div className="editor-card">
           <EntryEditor
             initialFields={entry.fields}
+            previewEntries={previewEntries}
             entry={{
               id: entry.id,
               name: entry.name,

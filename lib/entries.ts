@@ -2,7 +2,7 @@ import "server-only";
 
 import path from "node:path";
 import { getRepositoryFile, getRepositoryTree } from "@/lib/github";
-import type { EntryKind } from "@/lib/entries.shared";
+import type { EntryKind, PreviewEntry } from "@/lib/entries.shared";
 import { ModuleSchema } from "@/schemas/modules";
 import { PageContentSchema } from "@/schemas/page";
 import { PersonSchema } from "@/schemas/shared/person";
@@ -228,6 +228,19 @@ export async function getEntries(options: GetEntriesOptions = {}): Promise<Entry
 }
 
 export async function getEntry(id: string) {
+  return (await getEntryEditorData(id)).entry;
+}
+
+export async function getEntryEditorData(id: string) {
   const result = await getEntries({ pageSize: 100 });
-  return result.items.find((entry) => entry.id === id);
+  const entry = result.items.find((candidate) => candidate.id === id);
+  const previewEntries: PreviewEntry[] = result.items
+    .filter((candidate) => candidate.kind !== "page")
+    .map((candidate) => ({
+      path: candidate.path,
+      kind: candidate.kind,
+      schema: candidate.schema,
+      fields: candidate.fields,
+    }));
+  return { entry, previewEntries };
 }

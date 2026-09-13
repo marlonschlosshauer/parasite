@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CreateEntryForm } from "../_components/CreateEntryForm";
 import { EntryKindSchema } from "@/lib/entries.shared";
 import { requireGitHubAccess } from "@/lib/admin-auth";
+import { getEntries } from "@/lib/entries";
 
 export default async function CreateEntryPage({ searchParams }: {
   searchParams: Promise<{ type?: string }>;
@@ -10,6 +11,10 @@ export default async function CreateEntryPage({ searchParams }: {
   const { type } = await searchParams;
   const parsedKind = EntryKindSchema.safeParse(type);
   const kind = parsedKind.success ? parsedKind.data : "module";
+  const entries = await getEntries({ pageSize: 100 });
+  const previewEntries = entries.items
+    .filter((entry) => entry.kind !== "page")
+    .map((entry) => ({ path: entry.path, kind: entry.kind, schema: entry.schema, fields: entry.fields }));
 
   return (
     <div className="admin-page detail-page">
@@ -27,7 +32,7 @@ export default async function CreateEntryPage({ searchParams }: {
           <div className="editor-card-head">
             <div><h2>Create {kind}</h2><p>No repository changes are made until you save.</p></div>
           </div>
-          <CreateEntryForm kind={kind} />
+          <CreateEntryForm kind={kind} previewEntries={previewEntries} />
         </div>
       </section>
     </div>

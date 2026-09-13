@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { saveEntryAction } from "@/app/admin/actions";
+import { EntryPreview } from "./EntryPreview";
+import type { PreviewEntry } from "@/lib/entries.shared";
 import type { SaveEntryInput } from "@/lib/save-entry";
 
 type Fields = Record<string, unknown>;
@@ -85,10 +87,11 @@ function Field({ label, value, path, onChange }: {
 interface EntryEditorProps {
   initialFields: Fields;
   entry: Omit<SaveEntryInput, "fields" | "version"> & { version?: string };
+  previewEntries: PreviewEntry[];
   isNew?: boolean;
 }
 
-export function EntryEditor({ initialFields, entry, isNew = false }: EntryEditorProps) {
+export function EntryEditor({ initialFields, entry, previewEntries, isNew = false }: EntryEditorProps) {
   const router = useRouter();
   const serializedInitial = useMemo(() => JSON.stringify(initialFields), [initialFields]);
   const [fields, setFields] = useState(initialFields);
@@ -124,11 +127,14 @@ export function EntryEditor({ initialFields, entry, isNew = false }: EntryEditor
   }
 
   return (
-    <>
-      <div className="editor-fields">
-        {Object.entries(fields).filter(([key]) => key !== "_type").map(([key, value]) => (
-          <Field key={key} label={key} value={value} path={[key]} onChange={handleChange} />
-        ))}
+    <div className="entry-editor">
+      <div className="editor-workspace">
+        <div className="editor-fields">
+          {Object.entries(fields).filter(([key]) => key !== "_type").map(([key, value]) => (
+            <Field key={key} label={key} value={value} path={[key]} onChange={handleChange} />
+          ))}
+        </div>
+        <EntryPreview kind={entry.kind} fields={fields} entries={previewEntries} />
       </div>
       <div className="editor-actions">
         <div>{message && <p className={message.startsWith("Error:") ? "save-error" : ""} role="status">{message.startsWith("Error:") ? "!" : "✓"} {message}</p>}</div>
@@ -136,6 +142,6 @@ export function EntryEditor({ initialFields, entry, isNew = false }: EntryEditor
           {isPending ? "Saving…" : isNew ? "Create entry" : "Save changes"}
         </button>
       </div>
-    </>
+    </div>
   );
 }

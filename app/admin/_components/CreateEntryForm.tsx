@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { EntryEditor } from "./EntryEditor";
-import type { EntryKind } from "@/lib/entries";
+import type { EntryKind, PreviewEntry } from "@/lib/entries.shared";
 
 const moduleSchemas = ["text", "hero", "grid", "quote", "cta"];
 
@@ -20,7 +20,7 @@ function templateFor(kind: EntryKind, schema: string): Record<string, unknown> {
   return moduleTemplate(schema);
 }
 
-export function CreateEntryForm({ kind }: { kind: EntryKind }) {
+export function CreateEntryForm({ kind, previewEntries }: { kind: EntryKind; previewEntries: PreviewEntry[] }) {
   const [schema, setSchema] = useState(kind === "module" ? "text" : kind === "shared" ? "person" : "page");
   const [name, setName] = useState("");
   const fields = useMemo(() => templateFor(kind, schema), [kind, schema]);
@@ -46,6 +46,7 @@ export function CreateEntryForm({ kind }: { kind: EntryKind }) {
       <EntryEditor
         key={`${kind}-${schema}`}
         initialFields={fields}
+        previewEntries={previewEntries}
         isNew
         entry={{ name: kind === "page" ? "New page" : name, kind, schema }}
       />
