@@ -179,9 +179,20 @@ a.entry-table-row:hover { background: #fafbf9; }
 .entry-empty { padding: 48px 22px; color: #92958f; text-align: center; font-size: 12px; }
 .pagination { min-height: 55px; padding: 0 22px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; border-top: 1px solid #e4e6e1; font-size: 11px; }
 .pagination a:last-child, .pagination span:last-child { text-align: right; }
-.pagination a { color: #363a33; font-weight: 600; }
-.pagination span { color: #b0b3ad; }
+.pagination a, .pagination button { padding: 0; color: #363a33; border: 0; background: transparent; font-size: 11px; font-weight: 600; text-align: left; }
+.pagination button:last-child { text-align: right; }
+.pagination span, .pagination button:disabled { color: #b0b3ad; }
 .pagination small { color: #8d9089; }
+.sync-inline { color: #6f873d; }
+.workspace-loading, .workspace-error { min-height: 360px; padding: 48px; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: white; border: 1px solid #e0e2de; border-radius: 8px; }
+.workspace-loading-detail, .editor-card > .workspace-error { min-height: 0; height: 100%; border: 0; }
+.workspace-spinner { width: 28px; height: 28px; margin-bottom: 18px; border: 2px solid #dfe4d7; border-top-color: #708a3b; border-radius: 50%; animation: workspace-spin .8s linear infinite; }
+@keyframes workspace-spin { to { transform: rotate(360deg); } }
+.workspace-loading strong, .workspace-error strong { font-size: 14px; }
+.workspace-loading p, .workspace-error p { max-width: 360px; margin: 8px 0 0; color: #8b8e87; font-size: 10px; line-height: 1.55; }
+.workspace-error > span { width: 30px; height: 30px; margin-bottom: 17px; display: grid; place-items: center; color: #954c44; background: #fff0ed; border-radius: 50%; font-size: 12px; font-weight: 700; }
+.workspace-error > div { margin-top: 18px; display: flex; gap: 8px; }
+.workspace-error > .button { margin-top: 18px; }
 
 /* Entry detail */
 .detail-topbar { min-height: 64px; padding-top: 0; padding-bottom: 0; }

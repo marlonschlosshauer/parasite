@@ -1,29 +1,15 @@
 import "server-only";
 
 import path from "node:path";
-import type { EntryKind, PreviewEntry } from "@/lib/entries.shared";
-import { openWorkspace } from "@/lib/workspace";
+import type { EntryDetail, EntryKind, PreviewEntry } from "@/lib/entries.shared";
+import { fuzzyScore, WorkspaceSnapshotSchema } from "@/lib/entries.shared";
+import { openWorkspace, type RepositoryWorkspace } from "@/lib/workspace";
 import type { WorkspaceTarget } from "@/lib/workspace-target";
 import { ModuleSchema } from "@/schemas/modules";
 import { PageContentSchema } from "@/schemas/page";
 import { PersonSchema } from "@/schemas/shared/person";
 
 export type { EntryKind } from "@/lib/entries.shared";
-
-export interface EntrySummary {
-  id: string;
-  name: string;
-  kind: EntryKind;
-  schema: string;
-  path: string;
-  route?: string;
-  updated: string;
-  version?: string;
-}
-
-export interface EntryDetail extends EntrySummary {
-  fields: Record<string, unknown>;
-}
 
 export interface GetEntriesOptions {
   kind?: EntryKind;
@@ -121,9 +107,12 @@ function parseContent(kind: Exclude<EntryKind, "page">, rawFields: unknown) {
   return fields;
 }
 
-async function getWorkspaceEntries(target: WorkspaceTarget): Promise<EntryDetail[]> {
-  const workspace = await openWorkspace(target);
-  const files = await workspace.listTrackedFiles();
+async function readWorkspaceEntries(
+  workspace: RepositoryWorkspace,
+  target: WorkspaceTarget,
+): Promise<EntryDetail[]> {
+  const versions = await workspace.listTrackedFileVersions();
+  const files = Array.from(versions.keys());
   const pageFiles = files.filter((filePath) =>
     filePath === "app/(app)/page.tsx" || /^app\/\(app\)\/.+\/page\.tsx$/.test(filePath),
   );
@@ -145,7 +134,7 @@ async function getWorkspaceEntries(target: WorkspaceTarget): Promise<EntryDetail
       path: filePath,
       route: fields.slug,
       updated: `Git · ${target.branch}`,
-      version: await workspace.fileVersion(filePath),
+      version: versions.get(filePath),
       fields: { ...fields },
     };
   }));
@@ -166,7 +155,7 @@ async function getWorkspaceEntries(target: WorkspaceTarget): Promise<EntryDetail
       schema: typeof fields._type === "string" ? fields._type : kind,
       path: filePath,
       updated: `Git · ${target.branch}`,
-      version: await workspace.fileVersion(filePath),
+      version: versions.get(filePath),
       fields,
     };
   }));
@@ -174,24 +163,26 @@ async function getWorkspaceEntries(target: WorkspaceTarget): Promise<EntryDetail
   return [...pages, ...content];
 }
 
-function fuzzyScore(value: string, query: string) {
-  const haystack = value.toLowerCase();
-  const needle = query.toLowerCase().trim();
-  if (!needle) return 0;
-  const exactIndex = haystack.indexOf(needle);
-  if (exactIndex >= 0) return 1000 - exactIndex;
+async function getWorkspaceEntries(target: WorkspaceTarget) {
+  const workspace = await openWorkspace(target);
+  return readWorkspaceEntries(workspace, target);
+}
 
-  let queryIndex = 0;
-  let score = 0;
-  let previousMatch = -2;
-  for (let index = 0; index < haystack.length && queryIndex < needle.length; index += 1) {
-    if (haystack[index] === needle[queryIndex]) {
-      score += previousMatch === index - 1 ? 3 : 1;
-      previousMatch = index;
-      queryIndex += 1;
-    }
-  }
-  return queryIndex === needle.length ? score : -1;
+export async function syncWorkspace(target: WorkspaceTarget) {
+  const workspace = await openWorkspace(target);
+  const [entries, branches] = await Promise.all([
+    readWorkspaceEntries(workspace, target),
+    workspace.listBranches(),
+  ]);
+  return WorkspaceSnapshotSchema.parse({
+    entries,
+    metadata: {
+      id: target.branch,
+      branch: target.branch,
+      branches,
+      syncedAt: new Date().toISOString(),
+    },
+  });
 }
 
 export async function getEntries(

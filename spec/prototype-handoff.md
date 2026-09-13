@@ -86,32 +86,44 @@ The admin lives under `/admin` and has no sidebar.
 
 ### Overview
 
-`/admin/[branch]` obtains entries through `getEntries` and provides:
+`/admin/[branch]` renders its shell immediately, then synchronizes the complete selected branch into TanStack DB through one client-initiated server action. It provides:
 
 - Counts for pages, modules, and shared entries.
 - Filtering by entry kind.
 - Fuzzy matching over entry name and repository path.
-- Pagination with a maximum page size of 100.
+- Client-side pagination over the synchronized collection.
 - An entry-type selector and Add entry button.
 - An explicit Git branch selector, feature-branch creation, and release creation on non-default branches.
 
 The Add entry interaction only navigates to `/admin/[branch]/new?type=...`; it performs no GitHub mutation.
 
-The selected branch is a dynamic URL segment and is converted into an explicit `WorkspaceTarget`. The default route is `/admin/main`; `/admin` temporarily redirects there. Branches containing `/` use one URL-encoded segment so the captured value remains the exact Git ref. Repository functions never infer the branch from a cookie or other ambient state. Switching branches returns to the overview and opens the branch-specific workspace.
+The selected branch is a dynamic URL segment and is converted into an explicit `WorkspaceTarget`. The default route is `/admin/main`; `/admin` temporarily redirects there. Branches containing `/` use one URL-encoded segment so the captured value remains the exact Git ref. Repository functions never infer the branch from a cookie or other ambient state. Switching branches returns to the overview and opens the branch-specific collection/workspace.
+
+### Client data and synchronization
+
+One persistent `DbClient` lives in the admin layout, so its branch-scoped collections survive navigation between overview, create, and detail routes. Each branch has two normalized Query Collections backed by a shared TanStack Query key:
+
+- An entry collection keyed by stable entry ID.
+- A one-row workspace metadata collection containing the branch list and synchronization timestamp.
+
+The query function posts the explicit target to the same-origin `/admin/workspace-sync` route handler. It opens/synchronizes the selected Sandbox checkout, reads every editable entry, obtains all Git blob versions in one `git ls-tree`, and returns one Zod-validated snapshot. Overview filtering, fuzzy matching, counts, and pagination then happen entirely in memory. Detail and create views subscribe to the same entry collection, so navigating after the initial synchronization requires no new Sandbox read.
+
+Collections are cached independently per repository and branch with an infinite stale/cache time for this prototype. Explicit retry controls are shown on synchronization failure. Branch creation updates the source branch's metadata collection before navigating, and an approved Eve `publish_changes` result refetches the active branch collection. A future IndexedDB persister can be introduced at this boundary without changing route components.
 
 ### Create and edit
 
 `/admin/[branch]/new` builds a local template for the selected kind/schema. Creation happens only when Create entry is pressed, using the same save path as editing.
 
-`/admin/[branch]/[entryId]` loads the entry and all non-page entries needed to resolve preview references. Its header is intentionally compact: back navigation, entries breadcrumb, lowercase entry name, and kind/schema badge on one line. The redundant sidebar/meta panel was removed.
+`/admin/[branch]/[entryId]` selects the entry and all non-page preview dependencies from the already synchronized collection. Its header is intentionally compact: back navigation, entries breadcrumb, lowercase entry name, and kind/schema badge on one line. The redundant sidebar/meta panel was removed.
 
 `EntryEditor` recursively renders strings, numbers, booleans, arrays, and nested objects. It:
 
 - Hides `_type` at every object depth.
 - Tracks a serialized saved snapshot to determine dirty state.
 - Enables Save only after a change; new entries begin dirty.
-- Uses a server action for save and reports success/errors inline.
-- Refreshes data after save and replaces the URL after creation.
+- Starts a TanStack DB insert/update transaction on save and reports persistence errors inline.
+- Applies the change optimistically, rolls it back if the server action fails, and refetches the canonical Git-backed snapshot after persistence.
+- Replaces the URL after optimistic creation using the same deterministic ID/path rules as the server.
 
 The editor owns an `.entry-editor` wrapper and fills the available viewport height on wide screens. Fields and preview scroll independently while the action bar stays at the bottom. Below 1100px it returns to normal document flow and stacks the preview below the fields.
 
@@ -153,6 +165,7 @@ Repository defaults can be overridden with:
 
 The public server functions are:
 
+- `syncWorkspace(target)` for the complete normalized branch snapshot used by TanStack DB.
 - `getEntries(target, options)` for kind filtering, fuzzy query, and pagination.
 - `getEntry(target, id)` for one entry.
 - `getEntryEditorData(target, id)` for an entry plus preview dependencies.
@@ -166,7 +179,7 @@ The UI has a separate persistent Sandbox for each Connect subject, repository, a
 
 Every workspace open obtains a fresh user-scoped GitHub token from Vercel Connect. Private cloning, fetches, and pushes use a static `GIT_ASKPASS` helper with the token supplied only in the individual command environment; the credential is not embedded in the remote URL or saved in the workspace.
 
-Reads fetch and fast-forward the selected branch, enumerate tracked files locally, and read page/content sources through the Sandbox filesystem. File versions remain Git blob SHAs, retaining optimistic concurrency checks without the previous GitHub API N+1 pattern.
+Reads fetch and fast-forward the selected branch, enumerate tracked files locally, and read page/content sources through the Sandbox filesystem. The UI synchronization gets all tracked file versions from one Git tree command. File versions remain Git blob SHAs, retaining optimistic concurrency checks without the previous GitHub API N+1 pattern.
 
 Saving performs server-side access verification and Zod validation, then works in the selected Sandbox checkout:
 
@@ -199,7 +212,7 @@ Eve route auth verifies the same Connect grant used by the admin. Its opaque sub
 - Page generation supports only the known module registry and overwrites the complete page file.
 - The field editor is value-shape-driven rather than schema-driven. It has no rich text, reference picker, media picker, field descriptions, validation UI, or reliable way to infer an item template for a genuinely empty array.
 - References are plain strings and referential integrity is checked only where resolution happens.
-- The entry list reads and parses all tracked content before filtering/pagination.
+- Initial branch synchronization intentionally reads and parses all tracked content; this provides instant subsequent navigation but will need on-demand or incremental synchronization for very large repositories.
 - There is no automated test suite beyond lint, TypeScript, and production builds.
 - Non-fast-forward updates are rejected with a reload/retry message; merging divergent work is intentionally outside the prototype.
 - Sandboxes are not deleted automatically when branches are removed or releases are merged.
@@ -242,4 +255,4 @@ pnpm lint
 pnpm build
 ```
 
-The project currently targets Next.js 16.3.5, React 19.2.8, Zod 4.6.2, and `@vercel/connect` 2.0.4. Because this Next.js version includes breaking and evolving APIs, read the relevant local documentation under `node_modules/next/dist/docs/` before changing framework behavior.
+The project currently targets Next.js 16.3.5, React 19.2.8, Zod 4.6.2, TanStack React DB 0.3.8, Query DB Collection 1.2.13, and `@vercel/connect` 2.0.4. Because this Next.js version includes breaking and evolving APIs, read the relevant local documentation under `node_modules/next/dist/docs/` before changing framework behavior.

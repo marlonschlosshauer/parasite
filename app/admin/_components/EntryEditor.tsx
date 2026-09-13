@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
-import { saveEntryAction } from "@/app/admin/actions";
+import { useMemo, useState } from "react";
+import { useWorkspaceCollections } from "@/app/admin/_data/workspace-db";
 import { EntryPreview } from "./EntryPreview";
-import type { PreviewEntry } from "@/lib/entries.shared";
+import type { EntryDetail, PreviewEntry } from "@/lib/entries.shared";
 import type { SaveEntryInput } from "@/lib/save-entry";
 import type { WorkspaceTarget } from "@/lib/workspace-target";
+import { PageContentSchema } from "@/schemas/page";
 
 type Fields = Record<string, unknown>;
 
@@ -93,14 +94,47 @@ interface EntryEditorProps {
   isNew?: boolean;
 }
 
+function slugify(value: string) {
+  const slug = value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  if (!slug) throw new Error("Enter a file name containing letters or numbers.");
+  return slug;
+}
+
+function newEntry(target: WorkspaceTarget, entry: EntryEditorProps["entry"], fields: Fields): EntryDetail {
+  if (entry.kind === "page") {
+    const page = PageContentSchema.parse(fields);
+    return {
+      id: page.slug === "/" ? "page-home" : `page-${page.slug.slice(1).replaceAll("/", "-")}`,
+      name: page.title,
+      kind: "page",
+      schema: "page",
+      path: page.slug === "/" ? "app/(app)/page.tsx" : `app/(app)${page.slug}/page.tsx`,
+      route: page.slug,
+      updated: `Git · ${target.branch}`,
+      fields,
+    };
+  }
+  const slug = slugify(entry.name);
+  return {
+    id: `${entry.kind}-${slug}`,
+    name: entry.name,
+    kind: entry.kind,
+    schema: entry.schema,
+    path: `content/${entry.kind === "module" ? "modules" : "shared"}/${slug}.json`,
+    updated: `Git · ${target.branch}`,
+    fields,
+  };
+}
+
 export function EntryEditor({ target, initialFields, entry, previewEntries, isNew = false }: EntryEditorProps) {
   const router = useRouter();
+  const { entries: entriesCollection } = useWorkspaceCollections(target);
   const serializedInitial = useMemo(() => JSON.stringify(initialFields), [initialFields]);
   const [fields, setFields] = useState(initialFields);
   const [savedSnapshot, setSavedSnapshot] = useState(serializedInitial);
   const [version, setVersion] = useState(entry.version);
   const [message, setMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
   const dirty = isNew || JSON.stringify(fields) !== savedSnapshot;
 
   function handleChange(path: (string | number)[], value: unknown) {
@@ -111,21 +145,32 @@ export function EntryEditor({ target, initialFields, entry, previewEntries, isNe
     });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!dirty) return;
     setMessage("");
-    startTransition(async () => {
-      const result = await saveEntryAction(target, { ...entry, fields, version });
-      if (!result.ok) {
-        setMessage(`Error: ${result.message}`);
-        return;
-      }
+    setIsPending(true);
+    try {
+      const optimistic = isNew ? newEntry(target, entry, fields) : undefined;
+      if (!optimistic && !entry.id) throw new Error("The entry ID is missing.");
+      const transaction = optimistic
+        ? entriesCollection.insert(optimistic)
+        : entriesCollection.update(entry.id, (draft) => {
+            draft.fields = structuredClone(fields);
+            draft.updated = `Git · ${target.branch}`;
+            if (entry.kind === "page" && typeof fields.title === "string") draft.name = fields.title;
+          });
+      await transaction.isPersisted.promise;
       setSavedSnapshot(JSON.stringify(fields));
-      setVersion(result.version);
+      const id = optimistic?.id ?? entry.id;
+      if (!id) throw new Error("The saved entry ID is missing.");
+      setVersion(entriesCollection.get(id)?.version ?? version);
       setMessage(`Saved and committed to ${target.branch}.`);
-      if (isNew) router.replace(`/admin/${encodeURIComponent(target.branch)}/${result.id}`);
-      router.refresh();
-    });
+      if (isNew) router.replace(`/admin/${encodeURIComponent(target.branch)}/${id}`);
+    } catch (error) {
+      setMessage(`Error: ${error instanceof Error ? error.message : "The entry could not be saved."}`);
+    } finally {
+      setIsPending(false);
+    }
   }
 
   return (
@@ -140,7 +185,7 @@ export function EntryEditor({ target, initialFields, entry, previewEntries, isNe
       </div>
       <div className="editor-actions">
         <div>{message && <p className={message.startsWith("Error:") ? "save-error" : ""} role="status">{message.startsWith("Error:") ? "!" : "✓"} {message}</p>}</div>
-        <button className="button button-dark" disabled={!dirty || isPending || (isNew && entry.kind !== "page" && !entry.name.trim())} onClick={handleSave}>
+        <button className="button button-dark" disabled={!dirty || isPending || (isNew && entry.kind !== "page" && !entry.name.trim())} onClick={() => void handleSave()}>
           {isPending ? "Saving…" : isNew ? "Create entry" : "Save changes"}
         </button>
       </div>

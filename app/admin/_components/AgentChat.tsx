@@ -1,10 +1,26 @@
 "use client";
 
-import { useEveAgent, type EveMessagePart } from "eve/react";
-import { useRouter } from "next/navigation";
+import {
+  useEveAgent,
+  type EveMessageData,
+  type EveMessagePart,
+  type UseEveAgentSnapshot,
+} from "eve/react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useWorkspaceCollections } from "@/app/admin/_data/workspace-db";
 import type { WorkspaceTarget } from "@/lib/workspace-target";
+
+function publishedChanges(snapshot: UseEveAgentSnapshot<EveMessageData>) {
+  return snapshot.data.messages.some((message) =>
+    message.parts.some((part) =>
+      part.type === "dynamic-tool"
+      && part.toolName === "publish_changes"
+      && part.state === "output-available"
+      && !part.partial,
+    ),
+  );
+}
 
 function partLabel(part: EveMessagePart) {
   if (part.type !== "dynamic-tool") return "";
@@ -68,10 +84,10 @@ function AgentChatSession({
   defaultBranch: string;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [message, setMessage] = useState("");
   const transcript = useRef<HTMLDivElement>(null);
   const isReadOnly = target.branch === defaultBranch;
+  const { entries } = useWorkspaceCollections(target);
   const agent = useEveAgent({
     prepareSend: (input) => ({
       ...input,
@@ -81,7 +97,9 @@ function AgentChatSession({
         persistentChangesAllowed: !isReadOnly,
       },
     }),
-    onFinish: () => router.refresh(),
+    onFinish: (snapshot) => {
+      if (publishedChanges(snapshot)) void entries.utils.refetch();
+    },
   });
   const busy = agent.status === "submitted" || agent.status === "streaming";
 

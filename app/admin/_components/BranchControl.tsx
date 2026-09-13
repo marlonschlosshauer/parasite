@@ -3,16 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createBranchAction, cutReleaseAction } from "@/app/admin/actions";
+import { useWorkspaceSnapshot } from "@/app/admin/_data/workspace-db";
 import type { WorkspaceTarget } from "@/lib/workspace-target";
 import { AgentChat } from "./AgentChat";
 
 export function BranchControl({
   target,
-  branches,
   defaultBranch,
 }: {
   target: WorkspaceTarget;
-  branches: string[];
   defaultBranch: string;
 }) {
   const router = useRouter();
@@ -21,11 +20,13 @@ export function BranchControl({
   const [message, setMessage] = useState("");
   const [releaseUrl, setReleaseUrl] = useState("");
   const [isPending, startTransition] = useTransition();
+  const { metadata, isLoading, collections } = useWorkspaceSnapshot(target);
+  const branches = metadata?.branches ?? [target.branch];
   const isDefault = target.branch === defaultBranch;
   const options = branches.includes(target.branch) ? branches : [target.branch, ...branches];
 
   function visitBranch(branch: string) {
-    router.push(`/admin/${encodeURIComponent(branch)}`);
+    startTransition(() => router.push(`/admin/${encodeURIComponent(branch)}`));
   }
 
   function handleCreate() {
@@ -36,6 +37,13 @@ export function BranchControl({
         setMessage(result.message);
         return;
       }
+      const nextBranches = Array.from(new Set([...branches, result.branch])).sort((left, right) => left.localeCompare(right));
+      collections.metadata.utils.writeUpsert({
+        id: target.branch,
+        branch: target.branch,
+        branches: nextBranches,
+        syncedAt: new Date().toISOString(),
+      });
       visitBranch(result.branch);
     });
   }
@@ -61,7 +69,7 @@ export function BranchControl({
         <select
           value={target.branch}
           onChange={(event) => visitBranch(event.target.value)}
-          disabled={isPending}
+          disabled={isPending || isLoading}
         >
           {options.map((branch) => (
             <option key={branch} value={branch}>
@@ -73,12 +81,13 @@ export function BranchControl({
       <button
         className="button button-outline"
         type="button"
+        disabled={isPending || isLoading}
         onClick={() => {
           setCreating((current) => !current);
           setMessage("");
         }}
       >
-        New branch
+        {isLoading ? "Syncing…" : "New branch"}
       </button>
       {!isDefault && (
         <button className="button button-dark" type="button" disabled={isPending} onClick={handleRelease}>

@@ -12,6 +12,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tanstack/query-core": "^5.102.8",
+    "@tanstack/query-db-collection": "^1.2.13",
+    "@tanstack/react-db": "^0.3.8",
     "@vercel/connect": "^2.0.4",
     "@vercel/sandbox": "^3.3.0",
     "ai": "^7.0.99",

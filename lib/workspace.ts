@@ -3,7 +3,12 @@ import "server-only";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { APIError, Sandbox } from "@vercel/sandbox";
-import { assertConfiguredRepository, getGitHubSubjectId, getGitHubToken } from "@/lib/github";
+import {
+  assertConfiguredRepository,
+  getGitHubSubjectId,
+  getGitHubToken,
+  GitHubSessionRequiredError,
+} from "@/lib/github";
 import { WorkspaceTargetSchema, type WorkspaceTarget } from "@/lib/workspace-target";
 
 const askPassScript = `#!/bin/sh
@@ -91,6 +96,18 @@ export class RepositoryWorkspace {
     return stdout.split("\0").filter(Boolean);
   }
 
+  async listTrackedFileVersions() {
+    const { stdout } = await this.git(["ls-tree", "-r", "-z", "HEAD"]);
+    const versions = new Map<string, string>();
+    for (const record of stdout.split("\0")) {
+      if (!record) continue;
+      const [metadata, filePath] = record.split("\t");
+      const version = metadata?.split(" ")[2];
+      if (filePath && version) versions.set(filePath, version);
+    }
+    return versions;
+  }
+
   async readFile(filePath: string) {
     return this.sandbox.fs.readFile(this.absolutePath(filePath), "utf8");
   }
@@ -113,7 +130,12 @@ export class RepositoryWorkspace {
   }
 
   async listBranches() {
-    await this.git(["fetch", "--prune", "origin"], { authenticated: true });
+    await this.git([
+      "fetch",
+      "--prune",
+      "origin",
+      "+refs/heads/*:refs/remotes/origin/*",
+    ], { authenticated: true });
     const { stdout } = await this.git([
       "for-each-ref",
       "--format=%(refname:strip=3)",
@@ -256,7 +278,7 @@ export async function openWorkspace(untrustedTarget: WorkspaceTarget) {
   const target = WorkspaceTargetSchema.parse(untrustedTarget);
   assertConfiguredRepository(target);
   const subjectId = await getGitHubSubjectId();
-  if (!subjectId) throw new Error("GitHub authorization is required.");
+  if (!subjectId) throw new GitHubSessionRequiredError("GitHub authorization is required.");
   const name = sandboxName(subjectId, target);
   const pending = workspaceOpenings.get(name);
   if (pending) return pending;
