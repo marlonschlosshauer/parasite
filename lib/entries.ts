@@ -73,6 +73,7 @@ const pageEntries: EntryDetail[] = [
       title: "Product / Foo / Bar",
       slug: "/product/foo/bar",
       modules: [
+        "content/modules/product-hero.json",
         "content/modules/approach-grid.json",
         "content/modules/triumph-washington-quote.json",
         "content/modules/product-cta.json"
