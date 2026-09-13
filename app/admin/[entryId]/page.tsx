@@ -35,7 +35,16 @@ export default async function EntryDetailPage({
       </header>
       <section className="admin-content detail-content">
         <div className="editor-card">
-          <EntryEditor initialFields={entry.fields} />
+          <EntryEditor
+            initialFields={entry.fields}
+            entry={{
+              id: entry.id,
+              name: entry.name,
+              kind: entry.kind,
+              schema: entry.schema,
+              version: entry.version,
+            }}
+          />
         </div>
       </section>
     </div>

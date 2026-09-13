@@ -1,14 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { EntryKind } from "@/lib/entries";
-import { z } from "zod";
-
-const EntryKindSchema = z.enum(["page", "module", "shared"]);
+import { EntryKindSchema } from "@/lib/entries.shared";
 
 export function AddEntry() {
+  const router = useRouter();
   const [kind, setKind] = useState<EntryKind>("page");
-  const [message, setMessage] = useState("");
 
   return (
     <div className="add-entry-wrap">
@@ -18,10 +17,9 @@ export function AddEntry() {
         <option value="module">Module</option>
         <option value="shared">Shared</option>
       </select>
-      <button className="button button-dark" onClick={() => setMessage(`${kind} creation will be wired to code generation next.`)}>
+      <button className="button button-dark" onClick={() => router.push(`/admin/new?type=${kind}`)}>
         <span>＋</span> Add entry
       </button>
-      {message && <div className="stub-toast" role="status">{message}<button onClick={() => setMessage("")} aria-label="Dismiss">×</button></div>}
     </div>
   );
 }

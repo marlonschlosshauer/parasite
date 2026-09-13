@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import { saveEntryAction } from "@/app/admin/actions";
+import type { SaveEntryInput } from "@/lib/save-entry";
 
 type Fields = Record<string, unknown>;
 
@@ -30,8 +33,12 @@ function Field({ label, value, path, onChange }: {
         <legend>{label}<span>{value.length} items</span></legend>
         <div className="array-fields">
           {value.map((item, index) => (
-            <Field key={index} label={`${label} ${index + 1}`} value={item} path={[...path, index]} onChange={onChange} />
+            <div className="array-item" key={index}>
+              <Field label={`${label} ${index + 1}`} value={item} path={[...path, index]} onChange={onChange} />
+              <button type="button" className="array-remove" onClick={() => onChange(path, value.filter((_, itemIndex) => itemIndex !== index))}>Remove</button>
+            </div>
           ))}
+          <button type="button" className="array-add" onClick={() => onChange(path, [...value, value.length ? structuredClone(value[0]) : ""])}>＋ Add item</button>
         </div>
       </fieldset>
     );
@@ -75,12 +82,21 @@ function Field({ label, value, path, onChange }: {
   );
 }
 
-export function EntryEditor({ initialFields }: { initialFields: Fields }) {
+interface EntryEditorProps {
+  initialFields: Fields;
+  entry: Omit<SaveEntryInput, "fields" | "version"> & { version?: string };
+  isNew?: boolean;
+}
+
+export function EntryEditor({ initialFields, entry, isNew = false }: EntryEditorProps) {
+  const router = useRouter();
   const serializedInitial = useMemo(() => JSON.stringify(initialFields), [initialFields]);
   const [fields, setFields] = useState(initialFields);
   const [savedSnapshot, setSavedSnapshot] = useState(serializedInitial);
+  const [version, setVersion] = useState(entry.version);
   const [message, setMessage] = useState("");
-  const dirty = JSON.stringify(fields) !== savedSnapshot;
+  const [isPending, startTransition] = useTransition();
+  const dirty = isNew || JSON.stringify(fields) !== savedSnapshot;
 
   function handleChange(path: (string | number)[], value: unknown) {
     setMessage("");
@@ -92,8 +108,19 @@ export function EntryEditor({ initialFields }: { initialFields: Fields }) {
 
   function handleSave() {
     if (!dirty) return;
-    setSavedSnapshot(JSON.stringify(fields));
-    setMessage("Draft captured locally. File writes and commits are intentionally not connected yet.");
+    setMessage("");
+    startTransition(async () => {
+      const result = await saveEntryAction({ ...entry, fields, version });
+      if (!result.ok) {
+        setMessage(`Error: ${result.message}`);
+        return;
+      }
+      setSavedSnapshot(JSON.stringify(fields));
+      setVersion(result.version);
+      setMessage("Saved to GitHub and committed to main.");
+      if (isNew) router.replace(`/admin/${result.id}`);
+      router.refresh();
+    });
   }
 
   return (
@@ -104,8 +131,10 @@ export function EntryEditor({ initialFields }: { initialFields: Fields }) {
         ))}
       </div>
       <div className="editor-actions">
-        <div>{message && <p role="status">✓ {message}</p>}</div>
-        <button className="button button-dark" disabled={!dirty} onClick={handleSave}>Save changes</button>
+        <div>{message && <p className={message.startsWith("Error:") ? "save-error" : ""} role="status">{message.startsWith("Error:") ? "!" : "✓"} {message}</p>}</div>
+        <button className="button button-dark" disabled={!dirty || isPending || (isNew && entry.kind !== "page" && !entry.name.trim())} onClick={handleSave}>
+          {isPending ? "Saving…" : isNew ? "Create entry" : "Save changes"}
+        </button>
       </div>
     </>
   );

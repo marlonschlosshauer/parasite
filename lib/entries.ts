@@ -2,10 +2,13 @@ import "server-only";
 
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { getRepositoryFile, getRepositoryTree, hasConnectCredentials } from "@/lib/github";
+import type { EntryKind } from "@/lib/entries.shared";
 import { ModuleSchema } from "@/schemas/modules";
+import { PageContentSchema } from "@/schemas/page";
 import { PersonSchema } from "@/schemas/shared/person";
 
-export type EntryKind = "page" | "module" | "shared";
+export type { EntryKind } from "@/lib/entries.shared";
 
 export interface EntrySummary {
   id: string;
@@ -15,21 +18,33 @@ export interface EntrySummary {
   path: string;
   route?: string;
   updated: string;
+  version?: string;
 }
 
 export interface EntryDetail extends EntrySummary {
   fields: Record<string, unknown>;
 }
 
-const pageEntries: EntryDetail[] = [
+export interface GetEntriesOptions {
+  kind?: EntryKind;
+  query?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface EntryPage {
+  items: EntryDetail[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  counts: Record<EntryKind, number>;
+}
+
+const pageDefinitions = [
   {
-    id: "page-home",
     name: "Home",
-    kind: "page",
-    schema: "page",
     path: "app/(app)/page.tsx",
-    route: "/",
-    updated: "In repository",
     fields: {
       _type: "page",
       title: "Home",
@@ -37,18 +52,13 @@ const pageEntries: EntryDetail[] = [
       modules: [
         "content/modules/home-intro.json",
         "content/modules/approach-grid.json",
-        "content/modules/product-cta.json"
-      ]
-    }
+        "content/modules/product-cta.json",
+      ],
+    },
   },
   {
-    id: "page-about",
     name: "About",
-    kind: "page",
-    schema: "page",
     path: "app/(app)/about/page.tsx",
-    route: "/about",
-    updated: "In repository",
     fields: {
       _type: "page",
       title: "About",
@@ -56,18 +66,13 @@ const pageEntries: EntryDetail[] = [
       modules: [
         "content/modules/about-intro.json",
         "content/modules/triumph-washington-quote.json",
-        "content/modules/product-cta.json"
-      ]
-    }
+        "content/modules/product-cta.json",
+      ],
+    },
   },
   {
-    id: "page-product-foo-bar",
     name: "Product / Foo / Bar",
-    kind: "page",
-    schema: "page",
     path: "app/(app)/product/foo/bar/page.tsx",
-    route: "/product/foo/bar",
-    updated: "In repository",
     fields: {
       _type: "page",
       title: "Product / Foo / Bar",
@@ -76,11 +81,31 @@ const pageEntries: EntryDetail[] = [
         "content/modules/product-hero.json",
         "content/modules/approach-grid.json",
         "content/modules/triumph-washington-quote.json",
-        "content/modules/product-cta.json"
-      ]
-    }
-  }
+        "content/modules/product-cta.json",
+      ],
+    },
+  },
 ];
+
+function pageId(slug: string) {
+  return slug === "/" ? "page-home" : `page-${slug.slice(1).replaceAll("/", "-")}`;
+}
+
+function routeFromPagePath(pagePath: string) {
+  if (pagePath === "app/(app)/page.tsx") return "/";
+  return pagePath.replace(/^app\/\(app\)/, "").replace(/\/page\.tsx$/, "");
+}
+
+function pageFromSource(source: string) {
+  const encoded = source.match(/^\/\/ @parasite-page ([A-Za-z0-9+/=]+)$/m)?.[1];
+  if (!encoded) return undefined;
+  try {
+    const raw: unknown = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+    return PageContentSchema.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
 
 function titleFromFile(file: string) {
   return file
@@ -90,40 +115,159 @@ function titleFromFile(file: string) {
     .join(" ");
 }
 
-async function readJsonEntries(kind: Exclude<EntryKind, "page">): Promise<EntryDetail[]> {
-  const directory = path.join(process.cwd(), "content", kind === "module" ? "modules" : "shared");
-  const files = (await readdir(directory)).filter((file) => file.endsWith(".json")).sort();
+function parseContent(kind: Exclude<EntryKind, "page">, rawFields: unknown) {
+  const parsed = kind === "module" ? ModuleSchema.parse(rawFields) : PersonSchema.parse(rawFields);
+  const fields: Record<string, unknown> = { ...parsed };
+  return fields;
+}
 
-  return Promise.all(files.map(async (file) => {
-    const repoPath = path.posix.join("content", kind === "module" ? "modules" : "shared", file);
-    const rawFields: unknown = JSON.parse(await readFile(path.join(directory, file), "utf8"));
-    const parsedFields = kind === "module"
-      ? ModuleSchema.parse(rawFields)
-      : PersonSchema.parse(rawFields);
-    const fields: Record<string, unknown> = { ...parsedFields };
-
+async function getRemoteEntries(): Promise<EntryDetail[]> {
+  const tree = await getRepositoryTree();
+  const pageFiles = tree.filter((item) =>
+    item.type === "blob" &&
+    (item.path === "app/(app)/page.tsx" || /^app\/\(app\)\/.+\/page\.tsx$/.test(item.path)),
+  );
+  const pages = await Promise.all(pageFiles.map(async (item): Promise<EntryDetail> => {
+    const file = await getRepositoryFile(item.path);
+    const definition = pageDefinitions.find((candidate) => candidate.path === item.path);
+    const fallbackFields = definition?.fields ?? {
+      _type: "page",
+      title: routeFromPagePath(item.path).split("/").filter(Boolean).join(" / ") || "Home",
+      slug: routeFromPagePath(item.path),
+      modules: [],
+    };
+    const fields = pageFromSource(file.content) ?? PageContentSchema.parse(fallbackFields);
     return {
-      id: `${kind}-${file.replace(/\.json$/, "")}`,
-      name: titleFromFile(file),
+      id: pageId(fields.slug),
+      name: fields.title,
+      kind: "page",
+      schema: "page",
+      path: item.path,
+      route: fields.slug,
+      updated: "GitHub · main",
+      version: file.sha,
+      fields: { ...fields },
+    };
+  }));
+
+  const contentFiles = tree.filter((item) =>
+    item.type === "blob" &&
+    (item.path.startsWith("content/modules/") || item.path.startsWith("content/shared/")) &&
+    item.path.endsWith(".json"),
+  );
+  const content = await Promise.all(contentFiles.map(async (item): Promise<EntryDetail> => {
+    const kind: Exclude<EntryKind, "page"> = item.path.startsWith("content/modules/") ? "module" : "shared";
+    const file = await getRepositoryFile(item.path);
+    const fields = parseContent(kind, JSON.parse(file.content));
+    const filename = path.posix.basename(item.path);
+    return {
+      id: `${kind}-${filename.replace(/\.json$/, "")}`,
+      name: titleFromFile(filename),
       kind,
       schema: typeof fields._type === "string" ? fields._type : kind,
-      path: repoPath,
-      updated: "In repository",
+      path: item.path,
+      updated: "GitHub · main",
+      version: file.sha,
       fields,
     };
   }));
+
+  return [...pages, ...content];
 }
 
-export async function getEntries(): Promise<EntryDetail[]> {
-  const [modules, shared] = await Promise.all([
-    readJsonEntries("module"),
-    readJsonEntries("shared"),
-  ]);
+async function getLocalEntries(): Promise<EntryDetail[]> {
+  const pages: EntryDetail[] = pageDefinitions.map((definition) => {
+    const fields = PageContentSchema.parse(definition.fields);
+    return {
+      id: pageId(fields.slug),
+      name: definition.name,
+      kind: "page",
+      schema: "page",
+      path: definition.path,
+      route: fields.slug,
+      updated: "Local repository",
+      fields: { ...fields },
+    };
+  });
 
-  return [...pageEntries, ...modules, ...shared];
+  const readKind = async (kind: Exclude<EntryKind, "page">) => {
+    const directoryName = kind === "module" ? "modules" : "shared";
+    const directory = path.join(process.cwd(), "content", directoryName);
+    const files = (await readdir(directory)).filter((file) => file.endsWith(".json")).sort();
+    return Promise.all(files.map(async (file): Promise<EntryDetail> => {
+      const repoPath = path.posix.join("content", directoryName, file);
+      const rawFields: unknown = JSON.parse(await readFile(path.join(directory, file), "utf8"));
+      const fields = parseContent(kind, rawFields);
+      return {
+        id: `${kind}-${file.replace(/\.json$/, "")}`,
+        name: titleFromFile(file),
+        kind,
+        schema: typeof fields._type === "string" ? fields._type : kind,
+        path: repoPath,
+        updated: "Local repository",
+        fields,
+      };
+    }));
+  };
+
+  const [modules, shared] = await Promise.all([readKind("module"), readKind("shared")]);
+  return [...pages, ...modules, ...shared];
+}
+
+function fuzzyScore(value: string, query: string) {
+  const haystack = value.toLowerCase();
+  const needle = query.toLowerCase().trim();
+  if (!needle) return 0;
+  const exactIndex = haystack.indexOf(needle);
+  if (exactIndex >= 0) return 1000 - exactIndex;
+
+  let queryIndex = 0;
+  let score = 0;
+  let previousMatch = -2;
+  for (let index = 0; index < haystack.length && queryIndex < needle.length; index += 1) {
+    if (haystack[index] === needle[queryIndex]) {
+      score += previousMatch === index - 1 ? 3 : 1;
+      previousMatch = index;
+      queryIndex += 1;
+    }
+  }
+  return queryIndex === needle.length ? score : -1;
+}
+
+async function readAllEntries() {
+  return hasConnectCredentials() ? getRemoteEntries() : getLocalEntries();
+}
+
+export async function getEntries(options: GetEntriesOptions = {}): Promise<EntryPage> {
+  const pageSize = Math.min(Math.max(Math.floor(options.pageSize ?? 10), 1), 100);
+  const requestedPage = Math.max(Math.floor(options.page ?? 1), 1);
+  const allEntries = await readAllEntries();
+  const counts = allEntries.reduce<Record<EntryKind, number>>((result, entry) => {
+    result[entry.kind] += 1;
+    return result;
+  }, { page: 0, module: 0, shared: 0 });
+
+  const scored = allEntries
+    .filter((entry) => !options.kind || entry.kind === options.kind)
+    .map((entry) => ({ entry, score: options.query ? fuzzyScore(`${entry.name} ${entry.path}`, options.query) : 0 }))
+    .filter(({ score }) => score >= 0)
+    .sort((left, right) => right.score - left.score || left.entry.name.localeCompare(right.entry.name));
+  const total = scored.length;
+  const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+  const page = Math.min(requestedPage, pageCount);
+  const offset = (page - 1) * pageSize;
+
+  return {
+    items: scored.slice(offset, offset + pageSize).map(({ entry }) => entry),
+    total,
+    page,
+    pageSize,
+    pageCount,
+    counts,
+  };
 }
 
 export async function getEntry(id: string) {
-  const entries = await getEntries();
-  return entries.find((entry) => entry.id === id);
+  const result = await getEntries({ pageSize: 100 });
+  return result.items.find((entry) => entry.id === id);
 }
