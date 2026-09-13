@@ -5,7 +5,7 @@ import { EntryEditor } from "../../_components/EntryEditor";
 import { BranchControl } from "../../_components/BranchControl";
 import { requireGitHubAccess } from "@/lib/admin-auth";
 import { repository, workspaceTarget } from "@/lib/github";
-import { BranchNameSchema } from "@/lib/workspace-target";
+import { BranchRouteSegmentSchema } from "@/lib/workspace-target";
 
 export default async function EntryDetailPage({
   params,
@@ -14,7 +14,7 @@ export default async function EntryDetailPage({
 }) {
   await requireGitHubAccess();
   const { branch, entryId } = await params;
-  const parsedBranch = BranchNameSchema.safeParse(branch);
+  const parsedBranch = BranchRouteSegmentSchema.safeParse(branch);
   if (!parsedBranch.success) notFound();
   const target = workspaceTarget(parsedBranch.data);
   const { entry, previewEntries } = await getEntryEditorData(target, entryId);

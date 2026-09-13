@@ -99,6 +99,51 @@ button, select { cursor: pointer; }
 .branch-error, .branch-success { margin: 9px 0 0; color: #a1453c; font-size: 10px; line-height: 1.4; }
 .branch-control > .branch-error, .branch-control > .branch-success { position: absolute; z-index: 9; top: 48px; right: 0; width: max-content; max-width: 330px; padding: 9px 11px; background: white; border: 1px solid #e0e2de; border-radius: 6px; box-shadow: 0 10px 30px #242a201a; }
 .branch-success, .branch-success a { color: #61793a; }
+.agent-summon { color: #20211f; background: var(--acid); }
+.agent-summon > span { font-size: 14px; }
+.agent-summon-error { position: absolute; z-index: 12; top: 49px; right: 0; width: max-content; max-width: 290px; margin: 0; padding: 9px 11px; color: #a1453c; background: white; border: 1px solid #e0e2de; border-radius: 6px; box-shadow: 0 10px 30px #242a201a; font-size: 10px; }
+.agent-backdrop { position: fixed; z-index: 90; inset: 0; border: 0; background: #1719154d; backdrop-filter: blur(2px); }
+.agent-drawer { position: fixed; z-index: 91; inset: 0 0 0 auto; width: min(460px, 100vw); display: flex; flex-direction: column; color: #252724; background: #f8f9f6; border-left: 1px solid #d9dcd5; box-shadow: -24px 0 70px #1d201a26; animation: agent-enter .22s ease-out; }
+@keyframes agent-enter { from { transform: translateX(24px); opacity: 0; } }
+.agent-drawer-head { min-height: 76px; padding: 0 22px; display: flex; align-items: center; justify-content: space-between; background: white; border-bottom: 1px solid #e1e3df; }
+.agent-drawer-head > div { display: flex; align-items: center; gap: 11px; }
+.agent-drawer-head > div > div { display: flex; flex-direction: column; gap: 3px; }
+.agent-drawer-head strong { font-size: 14px; }
+.agent-drawer-head small { max-width: 315px; overflow: hidden; color: #969991; font: 9px var(--font-geist-mono), monospace; text-overflow: ellipsis; white-space: nowrap; }
+.agent-drawer-head > button { width: 34px; height: 34px; border: 0; border-radius: 50%; color: #777a74; background: #f1f3ef; font-size: 21px; }
+.agent-status-dot { width: 9px; height: 9px; background: var(--acid); border: 2px solid #29301d; border-radius: 50%; box-shadow: 0 0 0 3px #c9ff5540; }
+.agent-branch-notice { margin: 14px 16px 0; padding: 11px 13px; display: flex; gap: 4px; flex-direction: column; color: #556637; background: #f0f8df; border: 1px solid #dce9c2; border-radius: 7px; }
+.agent-branch-notice.is-readonly { color: #666961; background: #f1f2ef; border-color: #e0e2dc; }
+.agent-branch-notice strong { font-size: 10px; }
+.agent-branch-notice span { font-size: 9px; line-height: 1.45; }
+.agent-transcript { min-height: 0; padding: 22px 18px 30px; flex: 1; overflow-y: auto; }
+.agent-empty { height: 100%; min-height: 300px; display: grid; place-content: center; text-align: center; }
+.agent-empty > span { margin-bottom: 15px; color: #6e853d; font-size: 25px; }
+.agent-empty h2 { margin: 0; font-size: 19px; letter-spacing: -.025em; }
+.agent-empty p { max-width: 310px; margin: 10px auto 0; color: #8d9089; font-size: 11px; line-height: 1.6; }
+.agent-message { margin-bottom: 21px; }
+.agent-message > small { display: block; margin: 0 0 6px 3px; color: #93968f; font-size: 9px; font-weight: 650; }
+.agent-message > div { width: fit-content; max-width: 88%; padding: 11px 13px; background: white; border: 1px solid #e2e4df; border-radius: 5px 13px 13px 13px; box-shadow: 0 4px 16px #242a200a; }
+.agent-message-user { display: flex; align-items: flex-end; flex-direction: column; }
+.agent-message-user > div { color: #f5f6f3; background: #252724; border-color: #252724; border-radius: 13px 5px 13px 13px; }
+.agent-message-text { margin: 0; white-space: pre-wrap; font-size: 11px; line-height: 1.6; }
+.agent-message-text + .agent-message-text { margin-top: 8px; }
+.agent-tool { min-width: 220px; padding: 9px 10px; color: #747870; background: #f4f5f2; border: 1px solid #e3e5e0; border-radius: 6px; font: 9px var(--font-geist-mono), monospace; }
+.agent-tool + .agent-tool, .agent-message-text + .agent-tool, .agent-tool + .agent-message-text { margin-top: 8px; }
+.agent-tool-output-error { color: #a1453c; background: #fff3f1; }
+.agent-tool small { display: block; margin-top: 5px; line-height: 1.45; }
+.agent-tool a { display: block; margin-top: 7px; color: #536d2a; text-decoration: underline; }
+.agent-approval { margin-top: 9px; padding-top: 9px; border-top: 1px solid #dcdfd9; }
+.agent-approval p { margin: 0 0 8px; font-family: var(--font-geist-sans), sans-serif; line-height: 1.45; }
+.agent-approval .button { min-height: 32px; margin-right: 6px; padding: 0 11px; font-size: 9px; }
+.agent-error { padding: 10px 12px; color: #a1453c; background: #fff1ef; border-radius: 6px; font-size: 10px; line-height: 1.5; }
+.agent-composer { margin: 0 16px 16px; padding: 11px; background: white; border: 1px solid #daddd7; border-radius: 10px; box-shadow: 0 10px 35px #242a2012; }
+.agent-composer:focus-within { border-color: #9fb865; box-shadow: 0 0 0 3px #c9ff5526, 0 10px 35px #242a2012; }
+.agent-composer textarea { width: 100%; min-height: 66px; padding: 2px; resize: none; border: 0; outline: 0; color: #30322e; background: transparent; font: 11px/1.5 var(--font-geist-sans), sans-serif; }
+.agent-composer > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.agent-composer small { color: #a0a39c; font-size: 8px; }
+.agent-send { width: 31px; height: 31px; border: 0; border-radius: 7px; color: #20231d; background: var(--acid); font-size: 16px; font-weight: 700; }
+.agent-send:disabled { color: #a4a79f; background: #e8eae5; }
 .admin-content { padding: 30px 42px 50px; }
 .metric-row { margin-bottom: 25px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
 .metric { min-height: 92px; padding: 18px; display: flex; align-items: center; gap: 14px; background: white; border: 1px solid #e0e2de; border-radius: 8px; }
@@ -245,6 +290,7 @@ a.entry-table-row:hover { background: #fafbf9; }
   .admin-topbar { padding: 20px; align-items: flex-start; flex-direction: column; }
   .admin-topbar-actions { width: 100%; align-items: stretch; flex-direction: column; }
   .branch-control { width: 100%; flex-wrap: wrap; }
+  .agent-summon { flex: 1; }
   .branch-select { flex: 1; }
   .branch-select select { width: 100%; }
   .branch-popover { top: 52px; left: 0; right: auto; width: min(330px, 100%); }

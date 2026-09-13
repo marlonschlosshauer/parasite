@@ -19,6 +19,15 @@ export const BranchNameSchema = z.string().min(1).refine(isValidBranchName, {
   message: "Invalid Git branch name.",
 });
 
+export const BranchRouteSegmentSchema = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}, BranchNameSchema);
+
 export const FeatureBranchNameSchema = z.string()
   .min(1, "Enter a branch name.")
   .max(60, "Branch names must be 60 characters or fewer.")

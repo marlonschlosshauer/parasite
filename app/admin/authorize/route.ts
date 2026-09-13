@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
     response.cookies.set(githubSubjectCookie, subjectId, {
       httpOnly: true,
       maxAge: 60 * 60 * 24 * 30,
-      path: "/admin",
+      // The same HTTP-only subject also authenticates the same-origin Eve routes.
+      path: "/",
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     });

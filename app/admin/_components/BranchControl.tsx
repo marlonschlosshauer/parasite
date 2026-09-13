@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createBranchAction, cutReleaseAction } from "@/app/admin/actions";
 import type { WorkspaceTarget } from "@/lib/workspace-target";
+import { AgentChat } from "./AgentChat";
 
 export function BranchControl({
   target,
@@ -84,6 +85,7 @@ export function BranchControl({
           {isPending && !creating ? "Cutting…" : "Cut release"}
         </button>
       )}
+      <AgentChat target={target} defaultBranch={defaultBranch} />
 
       {creating && (
         <div className="branch-popover">

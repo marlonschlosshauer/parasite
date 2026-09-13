@@ -6,7 +6,7 @@ import { getBranches, getEntries, type EntryKind } from "@/lib/entries";
 import { EntryKindSchema } from "@/lib/entries.shared";
 import { requireGitHubAccess } from "@/lib/admin-auth";
 import { repository, workspaceTarget } from "@/lib/github";
-import { BranchNameSchema } from "@/lib/workspace-target";
+import { BranchRouteSegmentSchema } from "@/lib/workspace-target";
 
 const kindLabels: Record<EntryKind, string> = {
   page: "Page",
@@ -30,7 +30,7 @@ export default async function AdminPage({ params, searchParams }: {
 }) {
   await requireGitHubAccess();
   const { branch } = await params;
-  const parsedBranch = BranchNameSchema.safeParse(branch);
+  const parsedBranch = BranchRouteSegmentSchema.safeParse(branch);
   if (!parsedBranch.success) notFound();
   const target = workspaceTarget(parsedBranch.data);
   const queryParams = await searchParams;

@@ -180,6 +180,16 @@ Saving performs server-side access verification and Zod validation, then works i
 
 Branch creation pushes the current workspace HEAD to a new `parasite/<name>` remote branch without changing the source workspace. Branches are shared Git refs rather than per-user refs, while physical UI sandboxes remain isolated per Connect subject. Feature branches can cut a release through the GitHub pull-request API; an existing open PR is reused.
 
+## Eve agent
+
+The admin top bar now includes a **Summon Eve** control. It opens a branch-aware chat drawer backed by the same-origin Eve HTTP channel mounted through `withEve`. Browser requests are authenticated with the existing HTTP-only Vercel Connect subject; a small `/admin/agent-session` bridge promotes older `/admin`-scoped cookies to the root path before the drawer connects.
+
+Each durable conversation owns a separate Eve/Vercel Sandbox and binds itself to one explicit repository branch through `open_workspace`. The repository is cloned into `/workspace/repository`. The GitHub token is supplied only to the clone process and is not stored in the remote URL, so ordinary sandbox shell commands cannot push.
+
+Default-branch conversations are lookup-only. The agent may read and explain files, but the trusted `publish_changes` tool rejects the configured default branch. On a feature branch the agent can edit with its normal sandbox tools, inspect/test the result, and propose publishing. Publishing always requires human approval, obtains a fresh user-scoped Connect token, commits the sandbox diff, and pushes only to the conversation's validated feature branch. The existing UI release control remains responsible for opening a pull request.
+
+Eve route auth verifies the same Connect grant used by the admin. Its opaque subject cookie is not a GitHub credential, remains HTTP-only/SameSite, and is accepted only on same-origin requests. Eve's public health endpoint remains available, while agent inspection and session routes fail closed without repository authorization.
+
 ## Important limitations
 
 - There is no publish, merge, delete, rename, branch cleanup, or full conflict-resolution flow yet.
@@ -222,7 +232,6 @@ Likely next milestones:
 4. Add richer release state, publish = merge, and branch/sandbox cleanup.
 5. Add conflict/status handling beyond rejecting non-fast-forward writes.
 6. Add tests around schemas, path generation, marker parsing, code generation, authorization boundaries, and optimistic concurrency.
-7. Add an agent workflow in Vercel Sandbox that edits a checkout, runs validation/build, and produces changes under the same release conventions.
 
 ## Local verification
 

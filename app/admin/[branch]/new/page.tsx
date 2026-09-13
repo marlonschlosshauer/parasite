@@ -6,7 +6,7 @@ import { EntryKindSchema } from "@/lib/entries.shared";
 import { requireGitHubAccess } from "@/lib/admin-auth";
 import { getBranches, getEntries } from "@/lib/entries";
 import { repository, workspaceTarget } from "@/lib/github";
-import { BranchNameSchema } from "@/lib/workspace-target";
+import { BranchRouteSegmentSchema } from "@/lib/workspace-target";
 
 export default async function CreateEntryPage({ params, searchParams }: {
   params: Promise<{ branch: string }>;
@@ -14,7 +14,7 @@ export default async function CreateEntryPage({ params, searchParams }: {
 }) {
   await requireGitHubAccess();
   const { branch } = await params;
-  const parsedBranch = BranchNameSchema.safeParse(branch);
+  const parsedBranch = BranchRouteSegmentSchema.safeParse(branch);
   if (!parsedBranch.success) notFound();
   const target = workspaceTarget(parsedBranch.data);
   const { type } = await searchParams;
