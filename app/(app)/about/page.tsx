@@ -5,19 +5,24 @@ import intro from "@/content/modules/about-intro.json";
 import cta from "@/content/modules/product-cta.json";
 import quote from "@/content/modules/triumph-washington-quote.json";
 import george from "@/content/shared/george-washington.json";
-import { CtaModuleSchema, QuoteModuleSchema, TextModuleSchema } from "@/schemas/modules";
+import { withoutType } from "@/lib/content";
+import {
+  CtaModuleSchema,
+  QuoteModuleSchema,
+  TextModuleSchema,
+} from "@/schemas/modules";
 import { PersonSchema } from "@/schemas/shared/person";
 
-const introContent = TextModuleSchema.parse(intro);
+const introContent = withoutType(TextModuleSchema.parse(intro));
 const quoteContent = QuoteModuleSchema.parse(quote);
-const ctaContent = CtaModuleSchema.parse(cta);
-const georgeContent = PersonSchema.parse(george);
+const ctaContent = withoutType(CtaModuleSchema.parse(cta));
+const georgeContent = withoutType(PersonSchema.parse(george));
 
 export default function AboutPage() {
   return (
     <>
       <ModuleText {...introContent} />
-      <ModuleQuote _type={quoteContent._type} quote={quoteContent.quote} person={georgeContent} />
+      <ModuleQuote quote={quoteContent.quote} person={georgeContent} />
       <ModuleCta {...ctaContent} />
     </>
   );

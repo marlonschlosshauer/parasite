@@ -1,6 +1,8 @@
 import type { TextModuleContent } from "@/types/modules";
 
-export function ModuleText({ eyebrow, heading, body, align = "left" }: TextModuleContent) {
+type ModuleTextProps = Omit<TextModuleContent, "_type">;
+
+export function ModuleText({ eyebrow, heading, body, align = "left" }: ModuleTextProps) {
   return (
     <section className={`module text-module text-${align}`}>
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}

@@ -1,6 +1,8 @@
 import type { GridModuleContent } from "@/types/modules";
 
-export function ModuleGrid({ eyebrow, heading, cards }: GridModuleContent) {
+type ModuleGridProps = Omit<GridModuleContent, "_type">;
+
+export function ModuleGrid({ eyebrow, heading, cards }: ModuleGridProps) {
   return (
     <section className="module grid-module">
       <header>

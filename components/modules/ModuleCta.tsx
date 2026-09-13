@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { CtaModuleContent } from "@/types/modules";
 
-export function ModuleCta({ heading, body, link }: CtaModuleContent) {
+type ModuleCtaProps = Omit<CtaModuleContent, "_type">;
+
+export function ModuleCta({ heading, body, link }: ModuleCtaProps) {
   return (
     <section className="module cta-module">
       <div>
