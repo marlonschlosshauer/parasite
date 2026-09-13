@@ -28,16 +28,6 @@ export default async function EntryDetailPage({ params }: { params: Promise<{ en
           </div>
           <EntryEditor initialFields={entry.fields} />
         </div>
-        <aside className="entry-meta">
-          <h3>Entry information</h3>
-          <dl>
-            <div><dt>Entry ID</dt><dd className="mono">{entry.id}</dd></div>
-            <div><dt>Type</dt><dd>{entry.kind}</dd></div>
-            <div><dt>Schema</dt><dd>{entry.schema}</dd></div>
-            <div><dt>File</dt><dd className="mono">{entry.path}</dd></div>
-          </dl>
-          <div className="git-note"><span>⌘</span><p><strong>Git-backed</strong><br />Saving will create a commit once the repository integration is connected.</p></div>
-        </aside>
       </section>
     </div>
   );
