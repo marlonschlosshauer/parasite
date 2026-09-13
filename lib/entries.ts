@@ -65,7 +65,7 @@ const pageDefinitions = [
       slug: "/about",
       modules: [
         "content/modules/about-intro.json",
-        "content/modules/triumph-washington-quote.json",
+        "content/modules/good-one-lincoln-quote.json",
         "content/modules/product-cta.json",
       ],
     },
@@ -80,7 +80,7 @@ const pageDefinitions = [
       modules: [
         "content/modules/product-hero.json",
         "content/modules/approach-grid.json",
-        "content/modules/triumph-washington-quote.json",
+        "content/modules/good-one-lincoln-quote.json",
         "content/modules/product-cta.json",
       ],
     },
