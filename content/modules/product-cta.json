@@ -1,0 +1,9 @@
+{
+  "_type": "cta",
+  "heading": "Ready to make the repository the source of truth?",
+  "body": "This prototype keeps the final mile intentionally simple: inspect the entries, change a field, and see exactly what would be committed.",
+  "link": {
+    "label": "Open the editor",
+    "href": "/admin"
+  }
+}

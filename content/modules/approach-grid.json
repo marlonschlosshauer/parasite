@@ -1,0 +1,22 @@
+{
+  "_type": "grid",
+  "eyebrow": "A smaller stack",
+  "heading": "Content operations, expressed as code",
+  "cards": [
+    {
+      "eyebrow": "01",
+      "title": "Edit",
+      "text": "Structured fields map directly onto typed component props."
+    },
+    {
+      "eyebrow": "02",
+      "title": "Review",
+      "text": "Every release becomes a readable pull request in your repository."
+    },
+    {
+      "eyebrow": "03",
+      "title": "Publish",
+      "text": "Merge the change and let the deployment platform do the rest."
+    }
+  ]
+}
