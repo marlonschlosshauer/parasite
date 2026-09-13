@@ -10,7 +10,7 @@ const moduleSchemas = ["text", "hero", "grid", "quote", "cta"];
 function moduleTemplate(schema: string): Record<string, unknown> {
   if (schema === "hero") return { _type: "hero", eyebrow: "", heading: "New hero", body: "" };
   if (schema === "grid") return { _type: "grid", eyebrow: "", heading: "New grid", cards: [{ eyebrow: "01", title: "New card", text: "" }] };
-  if (schema === "quote") return { _type: "quote", quote: "", person: "content/shared/george-washington.json" };
+  if (schema === "quote") return { _type: "quote", quote: "", person: "content/shared/abe-lincoln.json" };
   if (schema === "cta") return { _type: "cta", heading: "New call to action", body: "", link: { label: "Learn more", href: "/" } };
   return { _type: "text", eyebrow: "", heading: "New text section", body: "", align: "left" };
 }
