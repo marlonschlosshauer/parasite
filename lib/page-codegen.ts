@@ -1,9 +1,12 @@
 import "server-only";
 
-import { getRepositoryFile } from "@/lib/github";
 import { ModuleSchema } from "@/schemas/modules";
 import type { PageContent } from "@/schemas/page";
 import { PersonSchema } from "@/schemas/shared/person";
+
+interface ContentReader {
+  readFile(path: string): Promise<string>;
+}
 
 const moduleNames = {
   text: { component: "ModuleText", schema: "TextModuleSchema" },
@@ -16,7 +19,7 @@ export function pagePathFromSlug(slug: string) {
   return slug === "/" ? "app/(app)/page.tsx" : `app/(app)${slug}/page.tsx`;
 }
 
-export async function generatePageSource(page: PageContent) {
+export async function generatePageSource(page: PageContent, reader: ContentReader) {
   const componentImports = new Set<string>();
   const schemaImports = new Set<string>();
   const jsonImports: string[] = [];
@@ -26,8 +29,8 @@ export async function generatePageSource(page: PageContent) {
   let usesPersonSchema = false;
 
   for (const [index, modulePath] of page.modules.entries()) {
-    const file = await getRepositoryFile(modulePath);
-    const parsedModule = ModuleSchema.parse(JSON.parse(file.content));
+    const source = await reader.readFile(modulePath);
+    const parsedModule = ModuleSchema.parse(JSON.parse(source));
     const jsonName = `module${index}Json`;
     const contentName = `module${index}Content`;
     jsonImports.push(`import ${jsonName} from ${JSON.stringify(`@/${modulePath.replace(/\.json$/, ".json")}`)};`);
@@ -37,8 +40,8 @@ export async function generatePageSource(page: PageContent) {
       schemaImports.add("QuoteModuleSchema");
       usesWithoutType = true;
       usesPersonSchema = true;
-      const personFile = await getRepositoryFile(parsedModule.person);
-      PersonSchema.parse(JSON.parse(personFile.content));
+      const personSource = await reader.readFile(parsedModule.person);
+      PersonSchema.parse(JSON.parse(personSource));
       const personJsonName = `person${index}Json`;
       const personName = `person${index}Content`;
       jsonImports.push(`import ${personJsonName} from ${JSON.stringify(`@/${parsedModule.person}`)};`);

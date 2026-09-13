@@ -4,6 +4,7 @@ import { getToken, startAuthorization, UserAuthorizationRequiredError } from "@v
 import type { ConnectTokenParams } from "@vercel/connect";
 import { cookies } from "next/headers";
 import { z } from "zod";
+import type { WorkspaceTarget } from "@/lib/workspace-target";
 
 export const repository = {
   owner: process.env.GITHUB_REPOSITORY_OWNER ?? "marlonschlosshauer",
@@ -30,7 +31,7 @@ function tokenParams(subjectId: string): ConnectTokenParams {
     authorizationDetails: [{
       type: "github_app_installation",
       repositories: [`${repository.owner}/${repository.name}`],
-      permissions: ["contents:write"],
+      permissions: ["contents:write", "pull_requests:write"],
     }],
   };
 }
@@ -39,10 +40,26 @@ export async function getGitHubSubjectId() {
   return (await cookies()).get(githubSubjectCookie)?.value;
 }
 
-async function getGitHubToken() {
-  const subjectId = await getGitHubSubjectId();
+export async function getGitHubToken(explicitSubjectId?: string) {
+  const subjectId = explicitSubjectId ?? await getGitHubSubjectId();
   if (!subjectId) throw new GitHubSessionRequiredError("GitHub authorization is required.");
   return getToken("github/parasite", tokenParams(subjectId));
+}
+
+export function workspaceTarget(branch = repository.branch): WorkspaceTarget {
+  return {
+    repository: { owner: repository.owner, name: repository.name },
+    branch,
+  };
+}
+
+export function assertConfiguredRepository(target: WorkspaceTarget) {
+  if (
+    target.repository.owner !== repository.owner ||
+    target.repository.name !== repository.name
+  ) {
+    throw new Error("The requested workspace does not match the configured repository.");
+  }
 }
 
 export async function createGitHubAuthorizationUrl(subjectId: string, callbackUrl: string) {
@@ -106,62 +123,30 @@ export async function getGitHubAccessState(): Promise<GitHubAccessState> {
   }
 }
 
-const TreeSchema = z.object({
-  tree: z.array(z.object({
-    path: z.string(),
-    type: z.string(),
-    sha: z.string(),
-  }).passthrough()),
+const PullRequestSchema = z.object({
+  number: z.number().int().positive(),
+  html_url: z.string().url(),
+  title: z.string(),
 }).passthrough();
 
-export async function getRepositoryTree() {
-  const data = await githubRequest(
-    `/repos/${repository.owner}/${repository.name}/git/trees/${repository.branch}?recursive=1`,
-  );
-  return TreeSchema.parse(data).tree;
-}
-
-const FileSchema = z.object({
-  path: z.string(),
-  sha: z.string(),
-  encoding: z.literal("base64"),
-  content: z.string(),
-}).passthrough();
-
-export async function getRepositoryFile(filePath: string) {
-  const data = await githubRequest(
-    `/repos/${repository.owner}/${repository.name}/contents/${encodeURIComponent(filePath).replaceAll("%2F", "/")}?ref=${encodeURIComponent(repository.branch)}`,
-  );
-  const file = FileSchema.parse(data);
-  return {
-    path: file.path,
-    sha: file.sha,
-    content: Buffer.from(file.content.replaceAll("\n", ""), "base64").toString("utf8"),
-  };
-}
-
-const SaveResponseSchema = z.object({
-  content: z.object({ path: z.string(), sha: z.string() }).nullable(),
-  commit: z.object({ sha: z.string(), html_url: z.string().url() }),
-}).passthrough();
-
-export async function putRepositoryFile(input: {
-  path: string;
-  content: string;
-  message: string;
-  sha?: string;
+export async function createRepositoryPullRequest(input: {
+  head: string;
+  base: string;
+  title: string;
 }) {
-  const data = await githubRequest(
-    `/repos/${repository.owner}/${repository.name}/contents/${encodeURIComponent(input.path).replaceAll("%2F", "/")}`,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        message: input.message,
-        content: Buffer.from(input.content).toString("base64"),
-        branch: repository.branch,
-        ...(input.sha ? { sha: input.sha } : {}),
-      }),
-    },
+  const existingData = await githubRequest(
+    `/repos/${repository.owner}/${repository.name}/pulls?state=open&head=${encodeURIComponent(`${repository.owner}:${input.head}`)}&base=${encodeURIComponent(input.base)}`,
   );
-  return SaveResponseSchema.parse(data);
+  const existing = z.array(PullRequestSchema).parse(existingData)[0];
+  if (existing) return existing;
+
+  const data = await githubRequest(`/repos/${repository.owner}/${repository.name}/pulls`, {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.title,
+      head: input.head,
+      base: input.base,
+    }),
+  });
+  return PullRequestSchema.parse(data);
 }

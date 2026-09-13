@@ -8,10 +8,10 @@ Parasite is a file-native CMS prototype for Next.js marketing sites. The central
 
 - Pages are real `page.tsx` files under `app/(app)`.
 - Modules and shared content are JSON files under `content/`.
-- The admin UI reads and changes those repository files through GitHub.
+- The admin UI reads and changes a checked-out repository in a persistent Vercel Sandbox.
 - Editors should get a CMS-like experience without moving page composition into an external CMS or a catch-all runtime route.
 
-The eventual editorial lifecycle is intended to be save = commit, release = pull request, and publish = merge. The prototype currently implements only saving, and saves commit directly to the configured branch.
+The editorial lifecycle is save = commit, release = pull request, and publish = merge. Saving and cutting a release are implemented; publishing is not.
 
 ## Current content model
 
@@ -93,8 +93,11 @@ The admin lives under `/admin` and has no sidebar.
 - Fuzzy matching over entry name and repository path.
 - Pagination with a maximum page size of 100.
 - An entry-type selector and Add entry button.
+- An explicit Git branch selector, feature-branch creation, and release creation on non-default branches.
 
 The Add entry interaction only navigates to `/admin/new?type=...`; it performs no GitHub mutation.
+
+The selected branch travels in the admin URL and is converted into an explicit `WorkspaceTarget`. Repository functions never infer the branch from a cookie or other ambient state. Switching branches returns to the overview and opens the branch-specific workspace.
 
 ### Create and edit
 
@@ -131,7 +134,7 @@ All repository operations are server-only. The configured Vercel Connect integra
 Access is user-scoped rather than app-scoped:
 
 1. `/admin/authorize` creates or reuses a random subject ID stored in the `parasite-github-subject` HTTP-only cookie.
-2. `startAuthorization` requests a GitHub App installation authorization for the configured repository and `contents:write`.
+2. `startAuthorization` requests a GitHub App installation authorization for the configured repository with `contents:write` and `pull_requests:write`.
 3. The user follows the Vercel authorization flow and returns through `/admin/authorize/callback`.
 4. Subsequent `getToken` calls use that user subject.
 5. Admin routes verify that the token can read the configured repository before rendering.
@@ -146,18 +149,26 @@ Repository defaults can be overridden with:
 - `GITHUB_REPOSITORY_NAME`
 - `GITHUB_REPOSITORY_BRANCH`
 
-## Repository read and save behavior
+## Sandbox workspace and repository behavior
 
 The public server functions are:
 
-- `getEntries(options)` for kind filtering, fuzzy query, and pagination.
-- `getEntry(id)` for one entry.
-- `getEntryEditorData(id)` for an entry plus preview dependencies.
-- `saveEntry(input)` for both create and update.
+- `getEntries(target, options)` for kind filtering, fuzzy query, and pagination.
+- `getEntry(target, id)` for one entry.
+- `getEntryEditorData(target, id)` for an entry plus preview dependencies.
+- `saveEntry(target, input)` for both create and update.
+- `createFeatureBranch(target, name)` for a `parasite/<name>` branch.
+- `cutRelease(target)` for a pull request into the configured default branch.
 
-Reads fetch the recursive Git tree and then fetch every relevant file from GitHub. This keeps GitHub authoritative, but it is currently an N+1 request pattern and will need caching, batching, or an indexed manifest as the repository grows.
+`WorkspaceTarget` contains the configured repository owner/name and an explicit branch. The server validates that the client-supplied repository matches the configured repository before opening anything. Branch names are validated independently, and newly created branch names use lowercase letters, numbers, and single hyphens beneath the `parasite/` prefix.
 
-Saving performs server-side access verification and Zod validation, then uses GitHub's Contents API:
+The UI has a separate persistent Sandbox for each Connect subject, repository, and branch. The sandbox name is a server-derived hash and is never an authorization credential. `Sandbox.getOrCreate` creates or resumes the VM, after which the workspace bootstrap explicitly clones the requested branch into `<sandbox.cwd>/repository`. Bootstrap verifies that `.git` exists on every open and repairs an incomplete checkout before use. One recent snapshot is retained for five days.
+
+Every workspace open obtains a fresh user-scoped GitHub token from Vercel Connect. Private cloning, fetches, and pushes use a static `GIT_ASKPASS` helper with the token supplied only in the individual command environment; the credential is not embedded in the remote URL or saved in the workspace.
+
+Reads fetch and fast-forward the selected branch, enumerate tracked files locally, and read page/content sources through the Sandbox filesystem. File versions remain Git blob SHAs, retaining optimistic concurrency checks without the previous GitHub API N+1 pattern.
+
+Saving performs server-side access verification and Zod validation, then works in the selected Sandbox checkout:
 
 - Existing files include their blob SHA, providing optimistic concurrency protection.
 - New modules/shared entries derive a safe filename from the entered name.
@@ -165,20 +176,23 @@ Saving performs server-side access verification and Zod validation, then uses Gi
 - Existing page slug changes are rejected because moving/deleting the old file is not implemented.
 - Content is formatted JSON with a trailing newline.
 - Page content is regenerated as TypeScript source.
-- A successful write creates a commit directly on the configured branch.
+- A successful write creates and pushes a commit to the explicitly selected branch.
+
+Branch creation pushes the current workspace HEAD to a new `parasite/<name>` remote branch without changing the source workspace. Branches are shared Git refs rather than per-user refs, while physical UI sandboxes remain isolated per Connect subject. Feature branches can cut a release through the GitHub pull-request API; an existing open PR is reused.
 
 ## Important limitations
 
-- There is no branch, pull request, release, publish, merge, delete, rename, rollback, or draft persistence flow yet.
-- Saves currently commit directly to `main` by default. This must change before implementing the intended release workflow.
+- There is no publish, merge, delete, rename, branch cleanup, or full conflict-resolution flow yet.
+- Saving on the default branch intentionally commits directly to it. Editors who want a review/release flow must create or select a feature branch first.
 - Only five module schemas and one editable shared schema are registered.
 - Page discovery has hardcoded fallbacks for the three demo pages; the marker is the scalable mechanism, but migration/discovery needs a deliberate design.
 - Page generation supports only the known module registry and overwrites the complete page file.
 - The field editor is value-shape-driven rather than schema-driven. It has no rich text, reference picker, media picker, field descriptions, validation UI, or reliable way to infer an item template for a genuinely empty array.
 - References are plain strings and referential integrity is checked only where resolution happens.
-- The entry list downloads and parses all content before filtering/pagination.
+- The entry list reads and parses all tracked content before filtering/pagination.
 - There is no automated test suite beyond lint, TypeScript, and production builds.
-- GitHub API errors are surfaced as text, but conflict-specific recovery UX is not implemented.
+- Non-fast-forward updates are rejected with a reload/retry message; merging divergent work is intentionally outside the prototype.
+- Sandboxes are not deleted automatically when branches are removed or releases are merged.
 
 ## Pending navigation feedback
 
@@ -205,8 +219,8 @@ Likely next milestones:
 1. Restore the pending custom link/loading indicator.
 2. Introduce a schema registry that drives creation templates, editor fields, preview dispatch, and page code generation from one definition.
 3. Add field-level Zod issue display and purpose-built reference inputs.
-4. Move saves onto per-release branches and model release state explicitly.
-5. Implement release = PR and publish = merge with conflict/status handling.
+4. Add richer release state, publish = merge, and branch/sandbox cleanup.
+5. Add conflict/status handling beyond rejecting non-fast-forward writes.
 6. Add tests around schemas, path generation, marker parsing, code generation, authorization boundaries, and optimistic concurrency.
 7. Add an agent workflow in Vercel Sandbox that edits a checkout, runs validation/build, and produces changes under the same release conventions.
 

@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { EntryKind } from "@/lib/entries";
 import { EntryKindSchema } from "@/lib/entries.shared";
 
-export function AddEntry() {
+export function AddEntry({ branch }: { branch: string }) {
   const router = useRouter();
   const [kind, setKind] = useState<EntryKind>("page");
 
@@ -17,7 +17,7 @@ export function AddEntry() {
         <option value="module">Module</option>
         <option value="shared">Shared</option>
       </select>
-      <button className="button button-dark" onClick={() => router.push(`/admin/new?type=${kind}`)}>
+      <button className="button button-dark" onClick={() => router.push(`/admin/new?type=${kind}&branch=${encodeURIComponent(branch)}`)}>
         <span>＋</span> Add entry
       </button>
     </div>

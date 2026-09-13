@@ -1,9 +1,10 @@
 import "server-only";
 
 import { z } from "zod";
-import { getRepositoryFile, putRepositoryFile } from "@/lib/github";
 import { EntryKindSchema } from "@/lib/entries.shared";
 import { generatePageSource, pagePathFromSlug } from "@/lib/page-codegen";
+import { openWorkspace } from "@/lib/workspace";
+import type { WorkspaceTarget } from "@/lib/workspace-target";
 import { ModuleSchema } from "@/schemas/modules";
 import { PageContentSchema } from "@/schemas/page";
 import { PersonSchema } from "@/schemas/shared/person";
@@ -29,8 +30,9 @@ function idFromPageSlug(slug: string) {
   return slug === "/" ? "page-home" : `page-${slug.slice(1).replaceAll("/", "-")}`;
 }
 
-export async function saveEntry(untrustedInput: unknown) {
+export async function saveEntry(target: WorkspaceTarget, untrustedInput: unknown) {
   const input = SaveEntryInputSchema.parse(untrustedInput);
+  const workspace = await openWorkspace(target);
   let filePath: string;
   let content: string;
   let id: string;
@@ -38,7 +40,7 @@ export async function saveEntry(untrustedInput: unknown) {
   if (input.kind === "page") {
     const page = PageContentSchema.parse(input.fields);
     filePath = pagePathFromSlug(page.slug);
-    content = await generatePageSource(page);
+    content = await generatePageSource(page, workspace);
     id = idFromPageSlug(page.slug);
     if (input.id && input.id !== id) {
       throw new Error("Changing a page slug is not supported yet because it requires moving the page file.");
@@ -56,23 +58,27 @@ export async function saveEntry(untrustedInput: unknown) {
     id = `${input.kind}-${slug}`;
   }
 
-  let version = input.version;
-  if (input.id && !version) {
-    version = (await getRepositoryFile(filePath)).sha;
+  const currentVersion = await workspace.fileVersion(filePath);
+  if (!input.id && currentVersion) {
+    throw new Error(`An entry already exists at ${filePath}.`);
   }
+  if (input.id && input.version && currentVersion !== input.version) {
+    throw new Error("This entry changed after it was opened. Reload it before saving.");
+  }
+
+  await workspace.writeFile(filePath, content);
   const action = input.id ? "Update" : "Create";
-  const result = await putRepositoryFile({
-    path: filePath,
-    content,
-    message: `${action.toLowerCase()} ${input.kind}: ${input.name}`,
-    sha: version,
-  });
+  const commit = await workspace.commitAndPush(
+    filePath,
+    `${action.toLowerCase()} ${input.kind}: ${input.name}`,
+  );
+  const version = await workspace.fileVersion(filePath);
 
   return {
     id,
-    path: result.content?.path ?? filePath,
-    version: result.content?.sha,
-    commitSha: result.commit.sha,
-    commitUrl: result.commit.html_url,
+    path: filePath,
+    version,
+    commitSha: commit.sha,
+    commitUrl: `https://github.com/${target.repository.owner}/${target.repository.name}/commit/${commit.sha}`,
   };
 }

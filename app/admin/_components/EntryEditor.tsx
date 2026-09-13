@@ -6,6 +6,7 @@ import { saveEntryAction } from "@/app/admin/actions";
 import { EntryPreview } from "./EntryPreview";
 import type { PreviewEntry } from "@/lib/entries.shared";
 import type { SaveEntryInput } from "@/lib/save-entry";
+import type { WorkspaceTarget } from "@/lib/workspace-target";
 
 type Fields = Record<string, unknown>;
 
@@ -85,13 +86,14 @@ function Field({ label, value, path, onChange }: {
 }
 
 interface EntryEditorProps {
+  target: WorkspaceTarget;
   initialFields: Fields;
   entry: Omit<SaveEntryInput, "fields" | "version"> & { version?: string };
   previewEntries: PreviewEntry[];
   isNew?: boolean;
 }
 
-export function EntryEditor({ initialFields, entry, previewEntries, isNew = false }: EntryEditorProps) {
+export function EntryEditor({ target, initialFields, entry, previewEntries, isNew = false }: EntryEditorProps) {
   const router = useRouter();
   const serializedInitial = useMemo(() => JSON.stringify(initialFields), [initialFields]);
   const [fields, setFields] = useState(initialFields);
@@ -113,15 +115,15 @@ export function EntryEditor({ initialFields, entry, previewEntries, isNew = fals
     if (!dirty) return;
     setMessage("");
     startTransition(async () => {
-      const result = await saveEntryAction({ ...entry, fields, version });
+      const result = await saveEntryAction(target, { ...entry, fields, version });
       if (!result.ok) {
         setMessage(`Error: ${result.message}`);
         return;
       }
       setSavedSnapshot(JSON.stringify(fields));
       setVersion(result.version);
-      setMessage("Saved to GitHub and committed to main.");
-      if (isNew) router.replace(`/admin/${result.id}`);
+      setMessage(`Saved and committed to ${target.branch}.`);
+      if (isNew) router.replace(`/admin/${result.id}?branch=${encodeURIComponent(target.branch)}`);
       router.refresh();
     });
   }

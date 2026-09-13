@@ -1,8 +1,9 @@
 import "server-only";
 
 import path from "node:path";
-import { getRepositoryFile, getRepositoryTree } from "@/lib/github";
 import type { EntryKind, PreviewEntry } from "@/lib/entries.shared";
+import { openWorkspace } from "@/lib/workspace";
+import type { WorkspaceTarget } from "@/lib/workspace-target";
 import { ModuleSchema } from "@/schemas/modules";
 import { PageContentSchema } from "@/schemas/page";
 import { PersonSchema } from "@/schemas/shared/person";
@@ -120,53 +121,52 @@ function parseContent(kind: Exclude<EntryKind, "page">, rawFields: unknown) {
   return fields;
 }
 
-async function getRemoteEntries(): Promise<EntryDetail[]> {
-  const tree = await getRepositoryTree();
-  const pageFiles = tree.filter((item) =>
-    item.type === "blob" &&
-    (item.path === "app/(app)/page.tsx" || /^app\/\(app\)\/.+\/page\.tsx$/.test(item.path)),
+async function getWorkspaceEntries(target: WorkspaceTarget): Promise<EntryDetail[]> {
+  const workspace = await openWorkspace(target);
+  const files = await workspace.listTrackedFiles();
+  const pageFiles = files.filter((filePath) =>
+    filePath === "app/(app)/page.tsx" || /^app\/\(app\)\/.+\/page\.tsx$/.test(filePath),
   );
-  const pages = await Promise.all(pageFiles.map(async (item): Promise<EntryDetail> => {
-    const file = await getRepositoryFile(item.path);
-    const definition = pageDefinitions.find((candidate) => candidate.path === item.path);
+  const pages = await Promise.all(pageFiles.map(async (filePath): Promise<EntryDetail> => {
+    const source = await workspace.readFile(filePath);
+    const definition = pageDefinitions.find((candidate) => candidate.path === filePath);
     const fallbackFields = definition?.fields ?? {
       _type: "page",
-      title: routeFromPagePath(item.path).split("/").filter(Boolean).join(" / ") || "Home",
-      slug: routeFromPagePath(item.path),
+      title: routeFromPagePath(filePath).split("/").filter(Boolean).join(" / ") || "Home",
+      slug: routeFromPagePath(filePath),
       modules: [],
     };
-    const fields = pageFromSource(file.content) ?? PageContentSchema.parse(fallbackFields);
+    const fields = pageFromSource(source) ?? PageContentSchema.parse(fallbackFields);
     return {
       id: pageId(fields.slug),
       name: fields.title,
       kind: "page",
       schema: "page",
-      path: item.path,
+      path: filePath,
       route: fields.slug,
-      updated: "GitHub · main",
-      version: file.sha,
+      updated: `Git · ${target.branch}`,
+      version: await workspace.fileVersion(filePath),
       fields: { ...fields },
     };
   }));
 
-  const contentFiles = tree.filter((item) =>
-    item.type === "blob" &&
-    (item.path.startsWith("content/modules/") || item.path.startsWith("content/shared/")) &&
-    item.path.endsWith(".json"),
+  const contentFiles = files.filter((filePath) =>
+    (filePath.startsWith("content/modules/") || filePath.startsWith("content/shared/")) &&
+    filePath.endsWith(".json"),
   );
-  const content = await Promise.all(contentFiles.map(async (item): Promise<EntryDetail> => {
-    const kind: Exclude<EntryKind, "page"> = item.path.startsWith("content/modules/") ? "module" : "shared";
-    const file = await getRepositoryFile(item.path);
-    const fields = parseContent(kind, JSON.parse(file.content));
-    const filename = path.posix.basename(item.path);
+  const content = await Promise.all(contentFiles.map(async (filePath): Promise<EntryDetail> => {
+    const kind: Exclude<EntryKind, "page"> = filePath.startsWith("content/modules/") ? "module" : "shared";
+    const source = await workspace.readFile(filePath);
+    const fields = parseContent(kind, JSON.parse(source));
+    const filename = path.posix.basename(filePath);
     return {
       id: `${kind}-${filename.replace(/\.json$/, "")}`,
       name: titleFromFile(filename),
       kind,
       schema: typeof fields._type === "string" ? fields._type : kind,
-      path: item.path,
-      updated: "GitHub · main",
-      version: file.sha,
+      path: filePath,
+      updated: `Git · ${target.branch}`,
+      version: await workspace.fileVersion(filePath),
       fields,
     };
   }));
@@ -194,14 +194,13 @@ function fuzzyScore(value: string, query: string) {
   return queryIndex === needle.length ? score : -1;
 }
 
-async function readAllEntries() {
-  return getRemoteEntries();
-}
-
-export async function getEntries(options: GetEntriesOptions = {}): Promise<EntryPage> {
+export async function getEntries(
+  target: WorkspaceTarget,
+  options: GetEntriesOptions = {},
+): Promise<EntryPage> {
   const pageSize = Math.min(Math.max(Math.floor(options.pageSize ?? 10), 1), 100);
   const requestedPage = Math.max(Math.floor(options.page ?? 1), 1);
-  const allEntries = await readAllEntries();
+  const allEntries = await getWorkspaceEntries(target);
   const counts = allEntries.reduce<Record<EntryKind, number>>((result, entry) => {
     result[entry.kind] += 1;
     return result;
@@ -227,12 +226,12 @@ export async function getEntries(options: GetEntriesOptions = {}): Promise<Entry
   };
 }
 
-export async function getEntry(id: string) {
-  return (await getEntryEditorData(id)).entry;
+export async function getEntry(target: WorkspaceTarget, id: string) {
+  return (await getEntryEditorData(target, id)).entry;
 }
 
-export async function getEntryEditorData(id: string) {
-  const result = await getEntries({ pageSize: 100 });
+export async function getEntryEditorData(target: WorkspaceTarget, id: string) {
+  const result = await getEntries(target, { pageSize: 100 });
   const entry = result.items.find((candidate) => candidate.id === id);
   const previewEntries: PreviewEntry[] = result.items
     .filter((candidate) => candidate.kind !== "page")
@@ -243,4 +242,9 @@ export async function getEntryEditorData(id: string) {
       fields: candidate.fields,
     }));
   return { entry, previewEntries };
+}
+
+export async function getBranches(target: WorkspaceTarget) {
+  const workspace = await openWorkspace(target);
+  return workspace.listBranches();
 }
