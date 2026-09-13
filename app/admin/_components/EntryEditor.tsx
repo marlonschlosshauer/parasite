@@ -123,7 +123,7 @@ export function EntryEditor({ target, initialFields, entry, previewEntries, isNe
       setSavedSnapshot(JSON.stringify(fields));
       setVersion(result.version);
       setMessage(`Saved and committed to ${target.branch}.`);
-      if (isNew) router.replace(`/admin/${result.id}?branch=${encodeURIComponent(target.branch)}`);
+      if (isNew) router.replace(`/admin/${encodeURIComponent(target.branch)}/${result.id}`);
       router.refresh();
     });
   }

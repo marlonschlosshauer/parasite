@@ -24,7 +24,7 @@ export function BranchControl({
   const options = branches.includes(target.branch) ? branches : [target.branch, ...branches];
 
   function visitBranch(branch: string) {
-    router.push(`/admin?branch=${encodeURIComponent(branch)}`);
+    router.push(`/admin/${encodeURIComponent(branch)}`);
   }
 
   function handleCreate() {

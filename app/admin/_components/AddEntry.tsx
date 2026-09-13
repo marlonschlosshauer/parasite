@@ -17,7 +17,7 @@ export function AddEntry({ branch }: { branch: string }) {
         <option value="module">Module</option>
         <option value="shared">Shared</option>
       </select>
-      <button className="button button-dark" onClick={() => router.push(`/admin/new?type=${kind}&branch=${encodeURIComponent(branch)}`)}>
+      <button className="button button-dark" onClick={() => router.push(`/admin/${encodeURIComponent(branch)}/new?type=${kind}`)}>
         <span>＋</span> Add entry
       </button>
     </div>

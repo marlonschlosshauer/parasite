@@ -86,7 +86,7 @@ The admin lives under `/admin` and has no sidebar.
 
 ### Overview
 
-`/admin` obtains entries through `getEntries` and provides:
+`/admin/[branch]` obtains entries through `getEntries` and provides:
 
 - Counts for pages, modules, and shared entries.
 - Filtering by entry kind.
@@ -95,15 +95,15 @@ The admin lives under `/admin` and has no sidebar.
 - An entry-type selector and Add entry button.
 - An explicit Git branch selector, feature-branch creation, and release creation on non-default branches.
 
-The Add entry interaction only navigates to `/admin/new?type=...`; it performs no GitHub mutation.
+The Add entry interaction only navigates to `/admin/[branch]/new?type=...`; it performs no GitHub mutation.
 
-The selected branch travels in the admin URL and is converted into an explicit `WorkspaceTarget`. Repository functions never infer the branch from a cookie or other ambient state. Switching branches returns to the overview and opens the branch-specific workspace.
+The selected branch is a dynamic URL segment and is converted into an explicit `WorkspaceTarget`. The default route is `/admin/main`; `/admin` temporarily redirects there. Branches containing `/` use one URL-encoded segment so the captured value remains the exact Git ref. Repository functions never infer the branch from a cookie or other ambient state. Switching branches returns to the overview and opens the branch-specific workspace.
 
 ### Create and edit
 
-`/admin/new` builds a local template for the selected kind/schema. Creation happens only when Create entry is pressed, using the same save path as editing.
+`/admin/[branch]/new` builds a local template for the selected kind/schema. Creation happens only when Create entry is pressed, using the same save path as editing.
 
-`/admin/[entryId]` loads the entry and all non-page entries needed to resolve preview references. Its header is intentionally compact: back navigation, entries breadcrumb, lowercase entry name, and kind/schema badge on one line. The redundant sidebar/meta panel was removed.
+`/admin/[branch]/[entryId]` loads the entry and all non-page entries needed to resolve preview references. Its header is intentionally compact: back navigation, entries breadcrumb, lowercase entry name, and kind/schema badge on one line. The redundant sidebar/meta panel was removed.
 
 `EntryEditor` recursively renders strings, numbers, booleans, arrays, and nested objects. It:
 
@@ -198,7 +198,7 @@ Branch creation pushes the current workspace HEAD to a new `parasite/<name>` rem
 
 The most recent intended UI improvement is a custom editor breadcrumb link using Next.js `useLinkStatus`, with its spinner rendered into `document.body` through a React portal. The status component must remain a React descendant of `Link` for the hook to work. Disabling prefetch on that custom link makes pending feedback observable more reliably, and a short CSS delay avoids flashing on fast transitions.
 
-This component is **not present in the repository state reviewed for this document**: `app/admin/[entryId]/page.tsx` still imports `Link` directly from `next/link`. Treat the custom link/portal spinner as the immediate pending implementation rather than completed behavior.
+This component is **not present in the repository state reviewed for this document**: `app/admin/[branch]/[entryId]/page.tsx` still imports `Link` directly from `next/link`. Treat the custom link/portal spinner as the immediate pending implementation rather than completed behavior.
 
 ## Direction and design intentions
 

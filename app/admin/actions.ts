@@ -17,8 +17,9 @@ export async function saveEntryAction(
   await requireGitHubAccess();
   try {
     const saved = await saveEntry(target, input);
-    revalidatePath("/admin");
-    revalidatePath(`/admin/${saved.id}`);
+    const adminPath = `/admin/${encodeURIComponent(target.branch)}`;
+    revalidatePath(adminPath);
+    revalidatePath(`${adminPath}/${saved.id}`);
     return { ok: true, id: saved.id, version: saved.version, commitUrl: saved.commitUrl };
   } catch (error) {
     return {
@@ -39,7 +40,7 @@ export async function createBranchAction(
   await requireGitHubAccess();
   try {
     const branch = await createFeatureBranch(target, name);
-    revalidatePath("/admin");
+    revalidatePath(`/admin/${encodeURIComponent(target.branch)}`);
     return { ok: true, branch };
   } catch (error) {
     return {

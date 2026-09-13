@@ -1,28 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBranches, getEntryEditorData } from "@/lib/entries";
-import { EntryEditor } from "../_components/EntryEditor";
-import { BranchControl } from "../_components/BranchControl";
+import { EntryEditor } from "../../_components/EntryEditor";
+import { BranchControl } from "../../_components/BranchControl";
 import { requireGitHubAccess } from "@/lib/admin-auth";
 import { repository, workspaceTarget } from "@/lib/github";
 import { BranchNameSchema } from "@/lib/workspace-target";
 
 export default async function EntryDetailPage({
   params,
-  searchParams,
 }: {
-  params: Promise<{ entryId: string }>;
-  searchParams: Promise<{ branch?: string }>;
+  params: Promise<{ branch: string; entryId: string }>;
 }) {
   await requireGitHubAccess();
-  const { entryId } = await params;
-  const query = await searchParams;
-  const parsedBranch = BranchNameSchema.safeParse(query.branch);
-  const target = workspaceTarget(parsedBranch.success ? parsedBranch.data : repository.branch);
+  const { branch, entryId } = await params;
+  const parsedBranch = BranchNameSchema.safeParse(branch);
+  if (!parsedBranch.success) notFound();
+  const target = workspaceTarget(parsedBranch.data);
   const { entry, previewEntries } = await getEntryEditorData(target, entryId);
   if (!entry) notFound();
   const branches = await getBranches(target);
-  const overviewHref = `/admin?branch=${encodeURIComponent(target.branch)}`;
+  const overviewHref = `/admin/${encodeURIComponent(target.branch)}`;
 
   return (
     <div className="admin-page detail-page">
