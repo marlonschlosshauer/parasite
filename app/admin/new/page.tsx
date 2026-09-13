@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { CreateEntryForm } from "../_components/CreateEntryForm";
 import { EntryKindSchema } from "@/lib/entries.shared";
+import { requireGitHubAccess } from "@/lib/admin-auth";
 
 export default async function CreateEntryPage({ searchParams }: {
   searchParams: Promise<{ type?: string }>;
 }) {
+  await requireGitHubAccess();
   const { type } = await searchParams;
   const parsedKind = EntryKindSchema.safeParse(type);
   const kind = parsedKind.success ? parsedKind.data : "module";

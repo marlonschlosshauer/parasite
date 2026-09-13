@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getEntry } from "@/lib/entries";
 import { EntryEditor } from "../_components/EntryEditor";
+import { requireGitHubAccess } from "@/lib/admin-auth";
 
 export default async function EntryDetailPage({
   params,
 }: {
   params: Promise<{ entryId: string }>;
 }) {
+  await requireGitHubAccess();
   const { entryId } = await params;
   const entry = await getEntry(entryId);
   if (!entry) notFound();

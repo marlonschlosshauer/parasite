@@ -1,6 +1,8 @@
 import "server-only";
 
-import { getToken } from "@vercel/connect";
+import { getToken, startAuthorization, UserAuthorizationRequiredError } from "@vercel/connect";
+import type { ConnectTokenParams } from "@vercel/connect";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 export const repository = {
@@ -10,15 +12,46 @@ export const repository = {
 };
 
 const GitHubErrorSchema = z.object({ message: z.string().optional() }).passthrough();
+const RepositorySchema = z.object({ full_name: z.string() }).passthrough();
 
-export function hasConnectCredentials() {
-  return Boolean(process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL);
+export const githubSubjectCookie = "parasite-github-subject";
+
+export class GitHubSessionRequiredError extends Error {}
+
+export class GitHubRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+function tokenParams(subjectId: string): ConnectTokenParams {
+  return {
+    subject: { type: "user", id: subjectId },
+    authorizationDetails: [{
+      type: "github_app_installation",
+      repositories: [`${repository.owner}/${repository.name}`],
+      permissions: ["contents:write"],
+    }],
+  };
+}
+
+export async function getGitHubSubjectId() {
+  return (await cookies()).get(githubSubjectCookie)?.value;
 }
 
 async function getGitHubToken() {
-  return getToken("github/parasite", {
-    subject: { type: "app" },
-  });
+  const subjectId = await getGitHubSubjectId();
+  if (!subjectId) throw new GitHubSessionRequiredError("GitHub authorization is required.");
+  return getToken("github/parasite", tokenParams(subjectId));
+}
+
+export async function createGitHubAuthorizationUrl(subjectId: string, callbackUrl: string) {
+  const authorization = await startAuthorization(
+    "github/parasite",
+    tokenParams(subjectId),
+    { callbackUrl },
+  );
+  return authorization.url;
 }
 
 export async function githubRequest(pathname: string, init?: RequestInit): Promise<unknown> {
@@ -42,10 +75,35 @@ export async function githubRequest(pathname: string, init?: RequestInit): Promi
     const message = parsedError.success && parsedError.data.message
       ? parsedError.data.message
       : `GitHub request failed with status ${response.status}`;
-    throw new Error(message);
+    throw new GitHubRequestError(message, response.status);
   }
 
   return body;
+}
+
+export type GitHubAccessState =
+  | { status: "authorized"; repository: string }
+  | { status: "authorization-required" }
+  | { status: "forbidden" }
+  | { status: "configuration-error"; message: string };
+
+export async function getGitHubAccessState(): Promise<GitHubAccessState> {
+  try {
+    const data = await githubRequest(`/repos/${repository.owner}/${repository.name}`);
+    const repo = RepositorySchema.parse(data);
+    return { status: "authorized", repository: repo.full_name };
+  } catch (error) {
+    if (error instanceof GitHubSessionRequiredError || error instanceof UserAuthorizationRequiredError) {
+      return { status: "authorization-required" };
+    }
+    if (error instanceof GitHubRequestError && (error.status === 403 || error.status === 404)) {
+      return { status: "forbidden" };
+    }
+    return {
+      status: "configuration-error",
+      message: error instanceof Error ? error.message : "GitHub authorization could not be checked.",
+    };
+  }
 }
 
 const TreeSchema = z.object({

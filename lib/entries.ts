@@ -1,8 +1,7 @@
 import "server-only";
 
-import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { getRepositoryFile, getRepositoryTree, hasConnectCredentials } from "@/lib/github";
+import { getRepositoryFile, getRepositoryTree } from "@/lib/github";
 import type { EntryKind } from "@/lib/entries.shared";
 import { ModuleSchema } from "@/schemas/modules";
 import { PageContentSchema } from "@/schemas/page";
@@ -175,45 +174,6 @@ async function getRemoteEntries(): Promise<EntryDetail[]> {
   return [...pages, ...content];
 }
 
-async function getLocalEntries(): Promise<EntryDetail[]> {
-  const pages: EntryDetail[] = pageDefinitions.map((definition) => {
-    const fields = PageContentSchema.parse(definition.fields);
-    return {
-      id: pageId(fields.slug),
-      name: definition.name,
-      kind: "page",
-      schema: "page",
-      path: definition.path,
-      route: fields.slug,
-      updated: "Local repository",
-      fields: { ...fields },
-    };
-  });
-
-  const readKind = async (kind: Exclude<EntryKind, "page">) => {
-    const directoryName = kind === "module" ? "modules" : "shared";
-    const directory = path.join(process.cwd(), "content", directoryName);
-    const files = (await readdir(directory)).filter((file) => file.endsWith(".json")).sort();
-    return Promise.all(files.map(async (file): Promise<EntryDetail> => {
-      const repoPath = path.posix.join("content", directoryName, file);
-      const rawFields: unknown = JSON.parse(await readFile(path.join(directory, file), "utf8"));
-      const fields = parseContent(kind, rawFields);
-      return {
-        id: `${kind}-${file.replace(/\.json$/, "")}`,
-        name: titleFromFile(file),
-        kind,
-        schema: typeof fields._type === "string" ? fields._type : kind,
-        path: repoPath,
-        updated: "Local repository",
-        fields,
-      };
-    }));
-  };
-
-  const [modules, shared] = await Promise.all([readKind("module"), readKind("shared")]);
-  return [...pages, ...modules, ...shared];
-}
-
 function fuzzyScore(value: string, query: string) {
   const haystack = value.toLowerCase();
   const needle = query.toLowerCase().trim();
@@ -235,7 +195,7 @@ function fuzzyScore(value: string, query: string) {
 }
 
 async function readAllEntries() {
-  return hasConnectCredentials() ? getRemoteEntries() : getLocalEntries();
+  return getRemoteEntries();
 }
 
 export async function getEntries(options: GetEntriesOptions = {}): Promise<EntryPage> {

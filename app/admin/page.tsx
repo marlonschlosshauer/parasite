@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AddEntry } from "./_components/AddEntry";
 import { getEntries, type EntryKind } from "@/lib/entries";
 import { EntryKindSchema } from "@/lib/entries.shared";
+import { requireGitHubAccess } from "@/lib/admin-auth";
 
 const kindLabels: Record<EntryKind, string> = {
   page: "Page",
@@ -21,6 +22,7 @@ function paginationHref(query: string, kind: EntryKind | undefined, page: number
 export default async function AdminPage({ searchParams }: {
   searchParams: Promise<{ query?: string; kind?: string; page?: string }>;
 }) {
+  await requireGitHubAccess();
   const params = await searchParams;
   const parsedKind = EntryKindSchema.safeParse(params.kind);
   const kind = parsedKind.success ? parsedKind.data : undefined;

@@ -63,6 +63,16 @@ button, select { cursor: pointer; }
 
 /* Admin */
 .admin-main { min-width: 0; min-height: 100vh; color: #20211f; background: #f6f7f5; }
+.access-page { min-height: 100vh; padding: 30px; display: grid; place-items: center; background: #eff1ed; }
+.access-card { width: min(100%, 460px); padding: 48px; text-align: center; background: white; border: 1px solid #dfe2dc; border-radius: 12px; box-shadow: 0 24px 80px #242a2012; }
+.access-mark { width: 42px; height: 42px; margin: 0 auto 32px; display: grid; place-items: center; color: #1d1f1d; background: var(--acid); border-radius: 9px; font-size: 17px; font-weight: 800; }
+.access-card .eyebrow { margin-bottom: 15px; }
+.access-card h1 { margin: 0; font-size: 30px; line-height: 1.12; letter-spacing: -.04em; font-weight: 620; }
+.access-copy { margin: 18px auto 0; color: #777a74; font-size: 13px; line-height: 1.65; }
+.access-error { margin: 18px 0 0; padding: 10px; color: #93473f; background: #fff1ef; border-radius: 6px; font-size: 10px; line-height: 1.45; }
+.access-button { width: 100%; margin-top: 28px; min-height: 48px; }
+.access-card > small { margin-top: 16px; display: block; color: #a0a39d; font-size: 9px; }
+.github-glyph { color: var(--acid); font-size: 10px; }
 .admin-page { min-height: 100vh; }
 .admin-topbar { min-height: 112px; padding: 25px 42px; display: flex; align-items: center; justify-content: space-between; gap: 30px; background: white; border-bottom: 1px solid #e1e3df; }
 .admin-topbar p { margin: 0 0 6px; color: #92958f; font-size: 11px; }
