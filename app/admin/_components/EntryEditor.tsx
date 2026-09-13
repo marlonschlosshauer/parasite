@@ -41,7 +41,7 @@ function Field({ label, value, path, onChange }: {
     return (
       <fieldset className="field-group nested-group">
         <legend>{label}</legend>
-        {Object.entries(value).map(([key, child]) => (
+        {Object.entries(value).filter(([key]) => key !== "_type").map(([key, child]) => (
           <Field key={key} label={key} value={child} path={[...path, key]} onChange={onChange} />
         ))}
       </fieldset>
@@ -99,7 +99,7 @@ export function EntryEditor({ initialFields }: { initialFields: Fields }) {
   return (
     <>
       <div className="editor-fields">
-        {Object.entries(fields).map(([key, value]) => (
+        {Object.entries(fields).filter(([key]) => key !== "_type").map(([key, value]) => (
           <Field key={key} label={key} value={value} path={[key]} onChange={handleChange} />
         ))}
       </div>

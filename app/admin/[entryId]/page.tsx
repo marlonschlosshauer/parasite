@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { getEntry } from "@/lib/entries";
 import { EntryEditor } from "../_components/EntryEditor";
 
-export default async function EntryDetailPage({ params }: { params: Promise<{ entryId: string }> }) {
+export default async function EntryDetailPage({
+  params,
+}: {
+  params: Promise<{ entryId: string }>;
+}) {
   const { entryId } = await params;
   const entry = await getEntry(entryId);
   if (!entry) notFound();
@@ -11,21 +15,26 @@ export default async function EntryDetailPage({ params }: { params: Promise<{ en
   return (
     <div className="admin-page detail-page">
       <header className="admin-topbar detail-topbar">
-        <div>
-          <Link className="back-link" href="/admin">← All entries</Link>
-          <div className="detail-heading">
-            <span className={`type-icon type-${entry.kind}`}>{entry.kind === "page" ? "□" : entry.kind === "module" ? "◫" : "◇"}</span>
-            <div><h1>{entry.name}</h1><p>{entry.path}</p></div>
-          </div>
-        </div>
-        {entry.route && <Link className="button button-outline" href={entry.route} target="_blank">View page ↗</Link>}
+        <nav className="detail-breadcrumb" aria-label="Breadcrumb">
+          <Link
+            className="breadcrumb-back"
+            href="/admin"
+            aria-label="Back to entries"
+          >
+            ←
+          </Link>
+          <Link className="breadcrumb-link" href="/admin">
+            / entries
+          </Link>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">{entry.name.toLowerCase()}</span>
+          <span className={`type-badge badge-${entry.kind}`}>
+            {entry.kind} · {entry.schema}
+          </span>
+        </nav>
       </header>
       <section className="admin-content detail-content">
         <div className="editor-card">
-          <div className="editor-card-head">
-            <div><h2>Fields</h2><p>Changes are kept in the browser for this prototype.</p></div>
-            <span className={`type-badge badge-${entry.kind}`}>{entry.kind} · {entry.schema}</span>
-          </div>
           <EntryEditor initialFields={entry.fields} />
         </div>
       </section>
