@@ -25,8 +25,9 @@ export default async function EntryDetailPage({
           >
             ←
           </Link>
+          <span className="breadcrumb-separator">/</span>
           <Link className="breadcrumb-link" href="/admin">
-            / entries
+            entries
           </Link>
           <span className="breadcrumb-separator">/</span>
           <span className="breadcrumb-current">{entry.name.toLowerCase()}</span>
