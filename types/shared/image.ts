@@ -1,6 +1,1 @@
-export interface ContentImage {
-  src: string;
-  alt: string;
-  width: number;
-  height: number;
-}
+export type { ContentImage } from "@/schemas/shared/image";

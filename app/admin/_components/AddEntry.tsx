@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import type { EntryKind } from "@/lib/entries";
+import { z } from "zod";
+
+const EntryKindSchema = z.enum(["page", "module", "shared"]);
 
 export function AddEntry() {
   const [kind, setKind] = useState<EntryKind>("page");
@@ -10,7 +13,7 @@ export function AddEntry() {
   return (
     <div className="add-entry-wrap">
       <label className="sr-only" htmlFor="entry-kind">Entry type</label>
-      <select id="entry-kind" value={kind} onChange={(event) => setKind(event.target.value as EntryKind)}>
+      <select id="entry-kind" value={kind} onChange={(event) => setKind(EntryKindSchema.parse(event.target.value))}>
         <option value="page">Page</option>
         <option value="module">Module</option>
         <option value="shared">Shared</option>

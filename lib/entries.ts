@@ -2,6 +2,8 @@ import "server-only";
 
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { ModuleSchema } from "@/schemas/modules";
+import { PersonSchema } from "@/schemas/shared/person";
 
 export type EntryKind = "page" | "module" | "shared";
 
@@ -93,7 +95,11 @@ async function readJsonEntries(kind: Exclude<EntryKind, "page">): Promise<EntryD
 
   return Promise.all(files.map(async (file) => {
     const repoPath = path.posix.join("content", kind === "module" ? "modules" : "shared", file);
-    const fields = JSON.parse(await readFile(path.join(directory, file), "utf8")) as Record<string, unknown>;
+    const rawFields: unknown = JSON.parse(await readFile(path.join(directory, file), "utf8"));
+    const parsedFields = kind === "module"
+      ? ModuleSchema.parse(rawFields)
+      : PersonSchema.parse(rawFields);
+    const fields: Record<string, unknown> = { ...parsedFields };
 
     return {
       id: `${kind}-${file.replace(/\.json$/, "")}`,

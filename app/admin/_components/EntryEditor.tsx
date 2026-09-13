@@ -4,16 +4,18 @@ import { useMemo, useState } from "react";
 
 type Fields = Record<string, unknown>;
 
+function isFields(value: unknown): value is Fields {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function updateAtPath(value: unknown, path: (string | number)[], nextValue: unknown): unknown {
   if (path.length === 0) return nextValue;
   const [head, ...tail] = path;
   if (Array.isArray(value)) {
     return value.map((item, index) => index === head ? updateAtPath(item, tail, nextValue) : item);
   }
-  return {
-    ...(value as Fields),
-    [head]: updateAtPath((value as Fields)[head], tail, nextValue),
-  };
+  if (!isFields(value)) return value;
+  return { ...value, [head]: updateAtPath(value[head], tail, nextValue) };
 }
 
 function Field({ label, value, path, onChange }: {
@@ -35,11 +37,11 @@ function Field({ label, value, path, onChange }: {
     );
   }
 
-  if (value && typeof value === "object") {
+  if (isFields(value)) {
     return (
       <fieldset className="field-group nested-group">
         <legend>{label}</legend>
-        {Object.entries(value as Fields).map(([key, child]) => (
+        {Object.entries(value).map(([key, child]) => (
           <Field key={key} label={key} value={child} path={[...path, key]} onChange={onChange} />
         ))}
       </fieldset>
@@ -82,7 +84,10 @@ export function EntryEditor({ initialFields }: { initialFields: Fields }) {
 
   function handleChange(path: (string | number)[], value: unknown) {
     setMessage("");
-    setFields((current) => updateAtPath(current, path, value) as Fields);
+    setFields((current) => {
+      const updated = updateAtPath(current, path, value);
+      return isFields(updated) ? updated : current;
+    });
   }
 
   function handleSave() {

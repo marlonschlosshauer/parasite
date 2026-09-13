@@ -10,6 +10,7 @@ const kindLabels: Record<EntryKind, string> = {
 
 export default async function AdminPage() {
   const entries = await getEntries();
+  const entryKinds: EntryKind[] = ["page", "module", "shared"];
   const counts = entries.reduce<Record<EntryKind, number>>((result, entry) => {
     result[entry.kind] += 1;
     return result;
@@ -24,7 +25,7 @@ export default async function AdminPage() {
 
       <section className="admin-content">
         <div className="metric-row">
-          {(Object.keys(counts) as EntryKind[]).map((kind) => (
+          {entryKinds.map((kind) => (
             <div className="metric" key={kind}>
               <span className={`type-icon type-${kind}`}>{kind === "page" ? "□" : kind === "module" ? "◫" : "◇"}</span>
               <div><strong>{counts[kind]}</strong><small>{kindLabels[kind]} entries</small></div>

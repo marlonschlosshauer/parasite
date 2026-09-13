@@ -1,7 +1,1 @@
-export interface Person {
-  _type: "person";
-  firstName: string;
-  lastName: string;
-  title?: string;
-  portrait?: string;
-}
+export type { Person } from "@/schemas/shared/person";

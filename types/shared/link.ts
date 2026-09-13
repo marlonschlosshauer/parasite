@@ -1,5 +1,1 @@
-export interface Link {
-  label: string;
-  href: string;
-  external?: boolean;
-}
+export type { Link } from "@/schemas/shared/link";

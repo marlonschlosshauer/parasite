@@ -5,8 +5,13 @@ import grid from "@/content/modules/approach-grid.json";
 import cta from "@/content/modules/product-cta.json";
 import quote from "@/content/modules/triumph-washington-quote.json";
 import george from "@/content/shared/george-washington.json";
-import type { CtaModuleContent, GridModuleContent } from "@/types/modules";
-import type { Person } from "@/types/shared/person";
+import { CtaModuleSchema, GridModuleSchema, QuoteModuleSchema } from "@/schemas/modules";
+import { PersonSchema } from "@/schemas/shared/person";
+
+const gridContent = GridModuleSchema.parse(grid);
+const quoteContent = QuoteModuleSchema.parse(quote);
+const ctaContent = CtaModuleSchema.parse(cta);
+const georgeContent = PersonSchema.parse(george);
 
 export default function ProductPage() {
   return (
@@ -16,9 +21,9 @@ export default function ProductPage() {
         <h1>Pages are files.<br />Content is portable.</h1>
         <p>Built for teams who want editorial workflows without surrendering the architecture of their Next.js application.</p>
       </section>
-      <ModuleGrid {...(grid as GridModuleContent)} />
-      <ModuleQuote _type="quote" quote={quote.quote} person={george as Person} />
-      <ModuleCta {...(cta as CtaModuleContent)} />
+      <ModuleGrid {...gridContent} />
+      <ModuleQuote _type={quoteContent._type} quote={quoteContent.quote} person={georgeContent} />
+      <ModuleCta {...ctaContent} />
     </>
   );
 }
